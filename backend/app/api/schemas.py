@@ -13,3 +13,8 @@ class Source(BaseModel):
 
 class QueryResponse(BaseModel):
     results: List[Source]
+
+# New schema for RAG response
+class RAGQueryResponse(BaseModel):
+    answer : str
+    sources : List[Source]

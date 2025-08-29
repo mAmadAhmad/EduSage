@@ -1,4 +1,8 @@
 # app/services/vector_service.py
+from langchain.chains.summarize.refine_prompts import prompt_template
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 import weaviate
 from weaviate.classes.config import Property, DataType, Configure
 from langchain_weaviate import WeaviateVectorStore
@@ -7,6 +11,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from app.core.config import settings
 
 # Global variables for the service components
+rag_chain = None
 weaviate_client = None
 embedding_model = None
 text_splitter = None
@@ -15,7 +20,7 @@ vector_store = None
 
 def init_vector_service():
     """Initializes all components needed for the vector service."""
-    global weaviate_client, embedding_model, text_splitter, vector_store
+    global weaviate_client, embedding_model, text_splitter, vector_store, rag_chain
 
     print("Initializing Vector Service...")
 
@@ -52,6 +57,31 @@ def init_vector_service():
         embedding=embedding_model,
     )
     print("Vector Service Initialized.")
+
+    # --- START: NEW GEMINI AND RAG CHAIN INITIALIZATION ---
+    print("Initializing Gemini model...")
+    # Initialize llm with API key
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=settings.GOOGLE_API_KEY)
+
+    # Template
+    prompt_template = """
+    You are an expert educational assistant. Based ONLY on the following context, provide a clear and concise answer to the question. If the information is not in the context then answer it to your best knowledge and inform if you don't know about the topic.
+    
+    Context:
+    {context}
+    
+    Question:
+    {question}
+    
+    Answer:
+    """
+
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+
+    # Rag Chain creation
+    rag_chain = prompt | llm | StrOutputParser()
+    print("Rag chain initialized.")
+    # --- END: NEW GEMINI AND RAG CHAIN INITIALIZATION ---
 
 
 def close_vector_service():

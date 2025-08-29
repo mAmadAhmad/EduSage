@@ -3,7 +3,6 @@ import os
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from langchain_community.document_loaders import PyPDFLoader
 import weaviate.classes as wvc
-from app.api.schemas import QueryRequest, QueryResponse
 # --- FIX 1: Import the service module itself ---
 from app.services import vector_service
 from app.core.config import settings
@@ -103,8 +102,8 @@ async def ingest_document(file: UploadFile = File(...)):
 
 
 # --- Query Endpoint ---
-@router.post("/query/", response_model=QueryResponse, summary="Query the knowledge base")
-async def query_documents(request: QueryRequest):
+@router.post("/query/", response_model=schemas.QueryResponse, summary="Query the knowledge base")
+async def query_documents(request: schemas.QueryRequest):
     """
     Performs similarity search in Weaviate to find relevant document chunks
     """
@@ -135,9 +134,44 @@ async def query_documents(request: QueryRequest):
         print(f"Error during query: {exc}")  # Log the error for debugging
         raise HTTPException(status_code=500, detail=f"An error occurred during query: {exc}")
 
+# --- RAG Query Endpoint ---
+@router.post("/rag_query/", response_model=schemas.RAGQueryResponse, summary="Query with RAG using Gemini")
+async def rag_query(request: schemas.QueryRequest):
+    if not vector_service.rag_chain:
+        raise HTTPException(status_code=503, detail="RAG chain is not initialized.")
+
+    try:
+        # 1. Retrieve relevant documents
+        retrieved_docs = await vector_service.vector_store.asimilarity_search(
+            query=request.query, k=request.top_k
+        )
+
+        if not retrieved_docs:
+            return schemas.RAGQueryResponse(answer="No relevant information found in documents.", sources=[])
+
+        # 2. Format context and invoke the RAG chain
+        context = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
+        answer = await vector_service.rag_chain.ainvoke({
+            "context": context,
+            "question": request.query
+        })
+
+        # 3. Format sources with keyword arguments (THE FIX IS HERE)
+        sources = [
+            schemas.Source(
+                content=doc.page_content,
+                source_file=doc.metadata.get("source", "Unknown"),
+                page=doc.metadata.get("page", 0)
+            )
+            for doc in retrieved_docs
+        ]
+
+        return schemas.RAGQueryResponse(answer=answer, sources=sources)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 # --- Database Wipe Endpoint ---
-@router.post("/wipe-collection-data/", summary="Delete all the objects in the Weaviate collection")
+@router.post("/wipe_collection_data/", summary="Delete all the objects in the Weaviate collection")
 async def wipe_collection_data():
 
     if not vector_service.weaviate_client:
