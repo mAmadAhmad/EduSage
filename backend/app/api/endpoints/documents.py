@@ -3,14 +3,13 @@ import os
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from langchain_community.document_loaders import PyPDFLoader
 import weaviate.classes as wvc
-# --- FIX 1: Import the service module itself ---
 from app.services import vector_service
 from app.core.config import settings
 from app.api import schemas
 
 router = APIRouter()
 
-# --- Ingest Endpoint ---
+# --- Start: Ingest Endpoint ---
 @router.post("/ingest/", summary="Ingest a PDF document")
 async def ingest_document(file: UploadFile = File(...)):
     """
@@ -100,8 +99,9 @@ async def ingest_document(file: UploadFile = File(...)):
         print(f"Error during ingestion: {exc}")  # Log the full error for debugging
         raise HTTPException(status_code=500, detail=f"An error occurred during ingestion: {exc}")
 
+# --- End: Ingest Endpoint ---
 
-# --- Query Endpoint ---
+# --- Start: Query Endpoint ---
 @router.post("/query/", response_model=schemas.QueryResponse, summary="Query the knowledge base")
 async def query_documents(request: schemas.QueryRequest):
     """
@@ -134,10 +134,13 @@ async def query_documents(request: schemas.QueryRequest):
         print(f"Error during query: {exc}")  # Log the error for debugging
         raise HTTPException(status_code=500, detail=f"An error occurred during query: {exc}")
 
-# --- RAG Query Endpoint ---
+# --- End: Query Endpoint ---
+
+# --- Start: RAG Query Endpoint ---
 @router.post("/rag_query/", response_model=schemas.RAGQueryResponse, summary="Query with RAG using Gemini")
 async def rag_query(request: schemas.QueryRequest):
-    if not vector_service.rag_chain:
+    rag_chain = vector_service.get_rag_chain()
+    if not rag_chain:
         raise HTTPException(status_code=503, detail="RAG chain is not initialized.")
 
     try:
@@ -170,7 +173,48 @@ async def rag_query(request: schemas.QueryRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
-# --- Database Wipe Endpoint ---
+# --- End: RAG Query Endpoint ---
+
+# --- Start: Quiz Generation Endpoint ---
+@router.post("/quiz/generate/", response_model=schemas.GenerateQuiz, summary="Generate Quiz from a document")
+async def generate_quiz(request: schemas.QuizGenerationRequest):
+    quiz_chain = vector_service.get_quiz_chain()
+    if not quiz_chain:
+        raise HTTPException(status_code=503, detail="Quiz generation chain is not initialized.")
+
+    try:
+        print(f"Generating quiz for document: {request.source_document}")
+
+        # 1. Retrieve context. For now, we'll retrieve chunks based on the whole document.
+        # A more advanced version could filter by page numbers.
+        collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
+
+        response = collection.query.fetch_objects(
+            limit=30,
+            filters=wvc.query.Filter.by_property("source").equal(request.source_document)
+        )
+
+        if not response.objects:
+            raise HTTPException(status_code=404, detail=f"Document '{request.source_document}' not found or has no content.")
+
+        context = "\n\n--\n\n".join([obj.properties['content'] for obj in response.objects])
+
+        # 2. invoke the chain with all required inputs
+        quiz_json = await vector_service.quiz_generation_chain.ainvoke({
+            "num_questions": request.num_questions,
+            "difficulty": request.difficulty,
+            "question_type": request.question_type,
+            "context": context
+        })
+
+        return quiz_json
+    except Exception as exc:
+        print(f"Error during quiz generation: {exc}")
+        raise HTTPException(status_code=500, detail=f"An error occurred during quiz generation: {str(exc)}")
+
+# --- End: Quiz Generation Endpoint ---
+
+# --- Start: Database Wipe Endpoint ---
 @router.post("/wipe_collection_data/", summary="Delete all the objects in the Weaviate collection")
 async def wipe_collection_data():
 
@@ -189,4 +233,8 @@ async def wipe_collection_data():
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+# --- End: Database Wipe Endpoint ---
+
+
 

@@ -1,8 +1,8 @@
 # app/services/vector_service.py
-from langchain.chains.summarize.refine_prompts import prompt_template
+# from langchain.chains.summarize.refine_prompts import prompt_template
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 import weaviate
 from weaviate.classes.config import Property, DataType, Configure
 from langchain_weaviate import WeaviateVectorStore
@@ -11,18 +11,19 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from app.core.config import settings
 
 # Global variables for the service components
-rag_chain = None
 weaviate_client = None
 embedding_model = None
 text_splitter = None
 vector_store = None
+llm = None  # We'll initialize the LLM once and share it.
+rag_chain = None
+quiz_generation_chain = None
 
 
 def init_vector_service():
-    """Initializes all components needed for the vector service."""
-    global weaviate_client, embedding_model, text_splitter, vector_store, rag_chain
-
-    print("Initializing Vector Service...")
+    """Initializes the base components that are always needed."""
+    global weaviate_client, embedding_model, text_splitter, vector_store, llm
+    print("Initializing base vector service components...")
 
     # Load embedding model
     embedding_model = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
@@ -58,31 +59,65 @@ def init_vector_service():
     )
     print("Vector Service Initialized.")
 
-    # --- START: NEW GEMINI AND RAG CHAIN INITIALIZATION ---
-    print("Initializing Gemini model...")
-    # Initialize llm with API key
+    # Initialize llm once to be shared by all chains
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=settings.GOOGLE_API_KEY)
 
-    # Template
-    prompt_template = """
-    You are an expert educational assistant. Based ONLY on the following context, provide a clear and concise answer to the question. If the information is not in the context then answer it to your best knowledge and inform if you don't know about the topic.
-    
-    Context:
-    {context}
-    
-    Question:
-    {question}
-    
-    Answer:
-    """
+    print("Base components initialized.")
 
-    prompt = ChatPromptTemplate.from_template(prompt_template)
+def get_rag_chain():
+    """Returns the singleton RAG chain, initializing it if necessary."""
+    global rag_chain
+    if rag_chain is None:
+        print("Initializing RAG chain for the first time...")
+        prompt_template_str = """
+                You are an expert educational assistant. Based ONLY on the following context, provide a clear and concise answer to the question. If the information is not in the context, say that you cannot find the answer in the provided documents.
+                Context: {context}
+                Question: {question}
+                Answer:
+                """
+        prompt = ChatPromptTemplate.from_template(prompt_template_str)
+        rag_chain = prompt | llm | StrOutputParser()
+        print("RAG chain initialized.")
+    return rag_chain
 
-    # Rag Chain creation
-    rag_chain = prompt | llm | StrOutputParser()
-    print("Rag chain initialized.")
-    # --- END: NEW GEMINI AND RAG CHAIN INITIALIZATION ---
-
+def get_quiz_chain():
+    """Returns the singleton Quiz Generation chain, initializing it if necessary."""
+    global quiz_generation_chain
+    if quiz_generation_chain is None:
+        print("Initializing Quiz Generation chain for the first time...")
+        quiz_prompt_template = """
+                You are an expert educator and quiz creator. Your task is to generate a quiz based ONLY on the provided context.
+                Do not use any external knowledge.
+            
+                Follow these instructions precisely:
+                1.  Generate exactly {num_questions} questions.
+                2.  The quiz difficulty should be {difficulty}.
+                3.  Each question must be of the type: {question_type}.
+                4.  For Multiple Choice Questions (MCQ), provide 4 options, with one being the correct answer.
+                5.  Base every question and its correct answer strictly on the provided context.
+                6.  Return the output as a single, valid JSON object following this exact structure:
+                    {{
+                      "title": "Quiz on the provided context",
+                      "questions": [
+                        {{
+                          "question_text": "The text of the first question",
+                          "question_type": "{question_type}",
+                          "options": ["Option A", "Option B", "Option C", "Option D"],
+                          "correct_answer": "The correct option text"
+                        }},
+                        ...
+                      ]
+                    }}        
+                    
+                    Context:
+                    ---
+                    {context}
+                    ---
+                    """
+        prompt = ChatPromptTemplate.from_template(quiz_prompt_template)
+        quiz_generation_chain = prompt | llm | JsonOutputParser()
+        print("Quiz Generation Chain initialized.")
+    return quiz_generation_chain
 
 def close_vector_service():
     """Closes the Weaviate client connection."""
