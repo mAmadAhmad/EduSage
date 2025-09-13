@@ -144,9 +144,18 @@ async def rag_query(request: schemas.QueryRequest):
         raise HTTPException(status_code=503, detail="RAG chain is not initialized.")
 
     try:
+        # Filtering logic
+        weaviate_filter = None
+
+        if request.page_start is not None and request.page_end is not None:
+            weaviate_filter = wvc.query.Filter.by_property("page").greater_or_equal(
+                request.page_start
+            ) & wvc.query.Filter.by_property("page").less_or_equal(
+                request.page_end
+            )
         # 1. Retrieve relevant documents
         retrieved_docs = await vector_service.vector_store.asimilarity_search(
-            query=request.query, k=request.top_k
+            query=request.query, k=request.top_k, filters=weaviate_filter
         )
 
         if not retrieved_docs:
@@ -176,7 +185,7 @@ async def rag_query(request: schemas.QueryRequest):
 # --- End: RAG Query Endpoint ---
 
 # --- Start: Quiz Generation Endpoint ---
-@router.post("/quiz/generate/", response_model=schemas.GenerateQuiz, summary="Generate Quiz from a document")
+@router.post("/quiz/generate/", response_model=schemas.GenerateQuizResponse, summary="Generate Quiz from a document")
 async def generate_quiz(request: schemas.QuizGenerationRequest):
     quiz_chain = vector_service.get_quiz_chain()
     if not quiz_chain:

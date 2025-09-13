@@ -119,7 +119,7 @@ def get_quiz_chain():
         print("Quiz Generation Chain initialized.")
     return quiz_generation_chain
 
-def close_vector_service():
+def close_vector_service():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
     """Closes the Weaviate client connection."""
     global weaviate_client
     if weaviate_client:
