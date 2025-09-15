@@ -9,6 +9,7 @@ from app.services.vector_service import init_vector_service, close_vector_servic
 from app.api.endpoints import documents, quizzes
 from app.db import session
 from app.models import quiz_models
+from fastapi.middleware.cors import CORSMiddleware
 
 
 
@@ -26,6 +27,21 @@ app = FastAPI(
     title="EduSage API",
     description="API for ingesting documents and powering the EduSage assistant.",
     lifespan=lifespan
+)
+
+# Add this block to allow CORS requests from your Next.js frontend
+origins = [
+    "http://localhost:3000",
+    "http://10.8.24.199:3000",
+    "http://localhost:8000" # Add this line to allow your local host to access the server
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include the API router
