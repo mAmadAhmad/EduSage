@@ -1,5 +1,7 @@
 // app/dashboard/page.tsx
 import Link from 'next/link';
+import CreateQuizButton from './CreateQuizButton';
+
 // Define a type for our Quiz data structure to match the backend
 interface Question {
   id: number;
@@ -41,8 +43,10 @@ export default async function DashboardPage() {
   return (
     <main className="flex min-h-screen flex-col items-center p-24 bg-gray-50">
       <div className="w-full max-w-4xl">
+        <div className='flex justify-between items-center mb-8'>
         <h1 className="text-4xl font-bold text-gray-800 mb-8">Teacher Dashboard</h1>
-
+          <CreateQuizButton />
+          </div>
         <div className="space-y-4">
           {quizzes.length > 0 ? (
             quizzes.map((quiz) => (

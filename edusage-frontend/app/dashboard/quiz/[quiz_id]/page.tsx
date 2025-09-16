@@ -28,14 +28,14 @@ async function getQuizById(quiz_id: string): Promise<Quiz | null> {
 }
 
 // This is our Server Component page
-export default async function QuizEditorPage({ params }: { params: { quiz_id: string } }) {
-  const quiz = await getQuizById(params.quiz_id);
+export default async function QuizEditorPage({ params: { quiz_id } }: { params: { quiz_id: string } }) {
+  const quiz = await getQuizById(quiz_id);
 
   if (!quiz) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-24">
         <h1 className="text-2xl font-bold">Quiz not found.</h1>
-        <p className="text-gray-500">Could not load quiz with ID: {params.quiz_id}</p>
+        <p className="text-gray-500">Could not load quiz with ID: {quiz_id}</p>
       </main>
     );
   }
