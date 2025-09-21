@@ -75,6 +75,7 @@ def update_quiz(db: Session, quiz_id: int, quiz: schemas.QuizUpdate) -> quiz_mod
     db.refresh(db_quiz)
     return db_quiz
 
+# -- D --
 def delete_quiz(db: Session, quiz_id: int) -> quiz_models.Quiz | None:
     """
     Deletes a quiz from the database.
@@ -84,3 +85,10 @@ def delete_quiz(db: Session, quiz_id: int) -> quiz_models.Quiz | None:
         db.delete(db_quiz)
         db.commit()
     return db_quiz
+
+def create_quiz_session(db: Session, quiz_id: int) -> quiz_models.QuizSession:
+    db_session = quiz_models.QuizSession(quiz_id=quiz_id)
+    db.add(db_session)
+    db.commit()
+    db.refresh(db_session)
+    return db_session

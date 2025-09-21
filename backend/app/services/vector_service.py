@@ -90,10 +90,11 @@ def get_quiz_chain():
                 Do not use any external knowledge.
             
                 Follow these instructions precisely:
-                1.  Generate exactly {num_questions} questions.
-                2.  The quiz difficulty should be {difficulty}.
-                3.  Each question must be of the type: {question_type}.
-                4.  For Multiple Choice Questions (MCQ), provide 4 options, with one being the correct answer.
+                1.  Generate exactly {num_mcq} Multiple Choice Questions (MCQ).
+                2.  Generate exactly {num_short_answer} Short Answer questions.
+                3.  The quiz difficulty should be {difficulty}.
+                4.  For MCQs, provide 4 options, with one being the correct answer.
+                5.  For Short Answer questions, the "options" field should be null.
                 5.  Base every question and its correct answer strictly on the provided context.
                 6.  Return the output as a single, valid JSON object following this exact structure:
                     {{
@@ -101,13 +102,16 @@ def get_quiz_chain():
                       "questions": [
                         {{
                           "question_text": "The text of the first question",
-                          "question_type": "{question_type}",
                           "options": ["Option A", "Option B", "Option C", "Option D"],
                           "correct_answer": "The correct option text"
                         }},
                         ...
                       ]
-                    }}        
+                    }}    
+                    ---
+                    ADDITIONAL INSTRUCTIONS FROM THE TEACHER:
+                    {custom_instructions}
+                    ---    
                     
                     Context:
                     ---

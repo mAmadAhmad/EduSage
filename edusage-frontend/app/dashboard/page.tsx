@@ -1,6 +1,8 @@
 // app/dashboard/page.tsx
 import Link from 'next/link';
 import CreateQuizButton from './CreateQuizButton';
+import AIQuizGenerator from './AIQuizGenerator';
+import QuizActions from './QuizActions';
 
 // Define a type for our Quiz data structure to match the backend
 interface Question {
@@ -45,25 +47,25 @@ export default async function DashboardPage() {
       <div className="w-full max-w-4xl">
         <div className='flex justify-between items-center mb-8'>
         <h1 className="text-4xl font-bold text-gray-800 mb-8">Teacher Dashboard</h1>
-          <CreateQuizButton />
+          <div className="flex gap-4">
+            <CreateQuizButton />
+            <AIQuizGenerator />
           </div>
-        <div className="space-y-4">
-          {quizzes.length > 0 ? (
-            quizzes.map((quiz) => (
-              // 2. Wrap the div with a Link component
-              <Link href={`/dashboard/quiz/${quiz.id}`} key={quiz.id}>
-                <div className="block bg-white p-6 rounded-lg shadow-md border border-gray-200 hover:bg-gray-100 transition-colors">
-                  <h2 className="text-2xl font-semibold text-blue-600">{quiz.title}</h2>
+          </div>
+        <div className="space-y-4 mt-8">
+          {quizzes.map((quiz) => (
+            <div key={quiz.id} className="bg-white p-6 rounded-lg shadow-md border">
+              <div className="flex justify-between items-start">
+                <Link href={`/dashboard/quiz/${quiz.id}`} className="block">
+                  <h2 className="text-2xl font-semibold text-blue-600 hover:text-blue-800">{quiz.title}</h2>
                   <p className="text-gray-600 mt-2">{quiz.instructions || 'No instructions provided.'}</p>
-                  <p className="text-sm text-gray-500 mt-4">{quiz.questions.length} questions</p>
-                </div>
-              </Link>
-            ))
-          ) : (
-            <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200 text-center">
-              <p className="text-gray-600">You haven't created any quizzes yet.</p>
+                </Link>
+                {/* USE THE NEW ACTIONS COMPONENT */}
+                <QuizActions quizId={quiz.id} />
+              </div>
+              <p className="text-sm text-gray-500 mt-4">{quiz.questions.length} questions</p>
             </div>
-          )}
+          ))}
         </div>
       </div>
     </main>

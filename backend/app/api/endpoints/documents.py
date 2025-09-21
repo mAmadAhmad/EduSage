@@ -194,13 +194,22 @@ async def generate_quiz(request: schemas.QuizGenerationRequest):
     try:
         print(f"Generating quiz for document: {request.source_document}")
 
-        # 1. Retrieve context. For now, we'll retrieve chunks based on the whole document.
-        # A more advanced version could filter by page numbers.
+        filters = wvc.query.Filter.by_property("source").equal(request.source_document)
+
+        if request.page_start is not None and request.page_end is not None:
+            page_filter = wvc.query.Filter.by_property("page").greater_or_equal(
+                request.page_start
+            ) & wvc.query.Filter.by_property("page").less_or_equal(
+                request.page_end
+            )
+
+            filters = filters & page_filter
+
         collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
 
         response = collection.query.fetch_objects(
-            limit=30,
-            filters=wvc.query.Filter.by_property("source").equal(request.source_document)
+            limit=50,
+            filters=filters
         )
 
         if not response.objects:
@@ -210,10 +219,11 @@ async def generate_quiz(request: schemas.QuizGenerationRequest):
 
         # 2. invoke the chain with all required inputs
         quiz_json = await vector_service.quiz_generation_chain.ainvoke({
-            "num_questions": request.num_questions,
+            "num_mcq": request.num_mcq,
+            "num_short_answer": request.num_short_answer,
             "difficulty": request.difficulty,
-            "question_type": request.question_type,
-            "context": context
+            "context": context,
+            "custom_instructions": request.custom_instructions or "None"
         })
 
         return quiz_json

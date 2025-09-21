@@ -1,4 +1,5 @@
 # app/models/quiz_models.py
+import secrets
 from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey
 from sqlalchemy.orm import relationship, declarative_base
 
@@ -27,3 +28,12 @@ class Question(Base):
     correct_answer = Column(Text, nullable=False)
 
     quiz = relationship("Quiz", back_populates="questions")
+
+class QuizSession(Base):
+    __tablename__ = "quiz_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quiz_id = Column(Integer, ForeignKey("quizzes.id"))
+    share_code = Column(String, unique=True, index=True, default=lambda: secrets.token_urlsafe(4).upper())
+
+    quiz = relationship("Quiz")

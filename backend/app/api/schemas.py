@@ -37,9 +37,12 @@ class Quiz(QuizBase):
 # --- AI GENERATION SCHEMAS ---
 class QuizGenerationRequest(BaseModel):
     source_document: str # The filename
-    num_questions: int = 5
-    question_type: str = "MCQ"
     difficulty: str = "Normal"
+    num_mcq: int = 3
+    num_short_answer: int = 2
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+    custom_instructions: Optional[str] = None
 
 class GenerateQuizResponse(BaseModel):
     title: str

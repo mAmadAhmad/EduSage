@@ -117,7 +117,7 @@ export default function QuizEditorForm({ initialQuiz }: { initialQuiz: Quiz }) {
             />
             
             {/* --- THIS ENTIRE BLOCK WAS MISSING AND IS NOW RESTORED --- */}
-            {question.question_type === 'MCQ' ? (
+            {question.question_type === 'MCQ' && question.options ? (
               <>
                 <div>
                   <label className="font-semibold text-gray-700">Options</label>

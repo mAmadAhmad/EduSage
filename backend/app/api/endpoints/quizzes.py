@@ -63,3 +63,13 @@ def delete_quiz(quiz_id: int, db: Session = Depends(get_db)):
     if db_quiz is None:
         raise HTTPException(status_code=404, detail="Quiz not found")
     return {"detail": f"Successfully deleted quiz with id {quiz_id}"}
+
+
+@router.post("/{quiz_id}/share", summary="Create a shareable session for a Quiz")
+def share_quiz(quiz_id: int, db: Session = Depends(get_db)):
+    db_quiz = quiz_crud.get_quiz(db, quiz_id=quiz_id)
+    if db_quiz is None:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    session = quiz_crud.create_quiz_session(db=db, quiz_id=quiz_id)
+    return {"share_code": session.share_code}
