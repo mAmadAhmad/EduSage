@@ -18,6 +18,7 @@ vector_store = None
 llm = None  # We'll initialize the LLM once and share it.
 rag_chain = None
 quiz_generation_chain = None
+grading_chain = None
 
 
 def init_vector_service():
@@ -60,7 +61,7 @@ def init_vector_service():
     print("Vector Service Initialized.")
 
     # Initialize llm once to be shared by all chains
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=settings.GOOGLE_API_KEY)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", google_api_key=settings.GOOGLE_API_KEY)
 
     print("Base components initialized.")
 
@@ -122,6 +123,46 @@ def get_quiz_chain():
         quiz_generation_chain = prompt | llm | JsonOutputParser()
         print("Quiz Generation Chain initialized.")
     return quiz_generation_chain
+
+def get_grading_chain():
+    """Returns the singleton AI Grading chain, initializing it if necessary."""
+    global grading_chain
+    if grading_chain is None:
+        print("Initializing AI Grading chain...")
+
+        # This prompt is the core of our AI grader
+        grading_prompt_template = """
+                You are an expert AI teaching assistant responsible for grading a student's quiz.
+
+                Your task is to grade the provided submission based on the correct answers and the teacher's grading criteria.
+
+                GRADING CRITERIA:
+                ---
+                {grading_criteria}
+                ---
+
+                QUIZ SUBMISSION:
+                ---
+                {submission_context}
+                ---
+
+                Provide your response as a single, valid JSON object only. Do not include any other text or markdown formatting.
+                The JSON object must follow this exact structure:
+                {{
+                    "overall_feedback": "A brief summary of the student's performance.",
+                    "graded_answers": [
+                        {{
+                            "question_id": <the integer ID of the question>,
+                            "score": <an integer score for this answer>,
+                            "feedback": "Your specific feedback for this answer."
+                        }}
+                    ]
+                }}
+                """
+        prompt = ChatPromptTemplate.from_template(grading_prompt_template)
+        grading_chain = prompt | llm | JsonOutputParser()
+        print("AI Grading chain initialized.")
+        return grading_chain
 
 def close_vector_service():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
     """Closes the Weaviate client connection."""

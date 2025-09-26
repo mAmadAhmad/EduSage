@@ -73,3 +73,11 @@ def share_quiz(quiz_id: int, db: Session = Depends(get_db)):
 
     session = quiz_crud.create_quiz_session(db=db, quiz_id=quiz_id)
     return {"share_code": session.share_code}
+
+@router.get("/{quiz_id}/submissions", response_model=List[schemas.Submission], summary="Get all submissions for a Quiz")
+def read_submissions_for_quiz(quiz_id: int, db: Session = Depends(get_db)):
+    """
+    Retrieve a list of all submissions for a specific quiz.
+    """
+    submissions = quiz_crud.get_submissions_for_quiz(db, quiz_id=quiz_id)
+    return submissions

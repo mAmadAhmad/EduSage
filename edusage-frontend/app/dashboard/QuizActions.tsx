@@ -1,6 +1,6 @@
-// app/dashboard/QuizActions.tsx
 'use client';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function QuizActions({ quizId }: { quizId: number }) {
   const router = useRouter();
@@ -30,7 +30,11 @@ export default function QuizActions({ quizId }: { quizId: number }) {
   };
 
   return (
-    <div className="flex gap-2">
+    <div className="flex items-center gap-4">
+      {/* NEW: Add the Submissions link */}
+      <Link href={`/dashboard/quiz/${quizId}/submissions`} className="text-sm font-semibold text-green-600 hover:underline">
+        Submissions
+      </Link>
       <button onClick={handleShare} className="text-sm text-blue-600 hover:underline">Share</button>
       <button onClick={handleDelete} className="text-sm text-red-600 hover:underline">Delete</button>
     </div>

@@ -86,9 +86,79 @@ def delete_quiz(db: Session, quiz_id: int) -> quiz_models.Quiz | None:
         db.commit()
     return db_quiz
 
+# -- Session --
 def create_quiz_session(db: Session, quiz_id: int) -> quiz_models.QuizSession:
     db_session = quiz_models.QuizSession(quiz_id=quiz_id)
     db.add(db_session)
     db.commit()
     db.refresh(db_session)
     return db_session
+
+# -- Get a quiz by its share code --
+def get_quiz_by_share_code(db: Session, share_code: str) -> quiz_models.Quiz | None:
+    session = db.query(quiz_models.QuizSession).filter(quiz_models.QuizSession.share_code == share_code).first()
+    if session:
+        return session.quiz
+    return None
+
+
+# NEW: Add this function to save a student's submission
+def create_submission(db: Session, session_id: int, submission: schemas.SubmissionCreate) -> quiz_models.Submission:
+    db_submission = quiz_models.Submission(
+        quiz_session_id=session_id,
+        student_name=submission.student_name,
+        student_roll_no=submission.student_roll_no
+    )
+    db.add(db_submission)
+    db.commit()
+    db.refresh(db_submission)
+
+    for answer in submission.answers:
+        db_answer = quiz_models.Answer(
+            submission_id=db_submission.id,
+            question_id=answer.question_id,
+            answer_text=answer.answer_text
+        )
+        db.add(db_answer)
+
+    db.commit()
+    db.refresh(db_submission)
+    return db_submission
+
+def get_submissions_for_quiz(db: Session, quiz_id: int) -> List[quiz_models.Submission]:
+    """Retrieves all submissions for a given quiz ID."""
+    return db.query(quiz_models.Submission)\
+    .join(quiz_models.QuizSession)\
+    .filter(quiz_models.QuizSession.quiz_id == quiz_id)\
+    .all()
+
+def get_submission(db: Session, submission_id: int) -> quiz_models.Submission | None:
+    """Retrieves a single submission by its ID."""
+    return db.query(quiz_models.Submission).filter(quiz_models.Submission.id == submission_id).first()
+
+
+# Function to gather all data for the grading view
+def get_submission_details(db: Session, submission_id: int) -> dict | None:
+    submission = db.query(quiz_models.Submission).filter(quiz_models.Submission.id == submission_id).first()
+    if not submission:
+        return None
+
+    quiz = submission.quiz_session.quiz
+
+    questions_data = []
+    for answer in submission.answers:
+        question = answer.question
+        questions_data.append({
+            "question_id": question.id,
+            "question_text": question.question_text,
+            "student_answer": answer.answer_text,
+            "correct_answer": question.correct_answer,
+        })
+
+    return {
+        "submission_id": submission.id,
+        "student_name": submission.student_name,
+        "quiz_id": quiz.id,
+        "quiz_title": quiz.title,
+        "questions": questions_data,
+    }

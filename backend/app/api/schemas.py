@@ -71,9 +71,80 @@ class QueryResponse(BaseModel):
 
 # Schema for RAG response
 class RAGQueryResponse(BaseModel):
-    answer : str
-    sources : List[Source]
+    answer: str
+    sources: List[Source]
 
 
+# --- NEW: Public Schemas for Student Quiz-Taking ---
+# This version of a question EXCLUDES the correct_answer
+class PublicQuestion(BaseModel):
+    id: int
+    question_text: str
+    question_type: str
+    options: Optional[List[str]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+# This is the quiz object that will be sent to the student
+class PublicQuiz(QuizBase):
+    id: int
+    questions: List[PublicQuestion]
+
+    model_config = ConfigDict(from_attributes=True)
 
 
+# --- NEW: Schemas for Student Submissions ---
+class AnswerCreate(BaseModel):
+    question_id: int
+    answer_text: str
+
+class Answer(AnswerCreate):
+    id: int
+    submission_id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class SubmissionCreate(BaseModel):
+    student_name: str
+    student_roll_no: Optional[str] = None
+    answers: List[AnswerCreate]
+
+
+class Submission(SubmissionCreate):
+    id: int
+    quiz_session_id: int
+    answers: List[Answer]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Schemas for the Grading View ---
+class GradedQuestion(BaseModel):
+    question_id: int
+    question_text: str
+    student_answer: str
+    correct_answer: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SubmissionDetail(BaseModel):
+    submission_id: int
+    student_name: str
+    quiz_id: int
+    quiz_title: str
+    questions: List[GradedQuestion]
+
+    model_config = ConfigDict(from_attributes=True)
+
+# --- Schemas for AI Grading ---
+class AIGradingRequest(BaseModel):
+    grading_criteria: str = "Be a fair and helpful grader. Provide a score from 0 to 10 for each answer and brief feedback."
+
+class GradedAnswerResponse(BaseModel):
+    question_id: int
+    score: int
+    feedback: str
+
+class AIGradingResponse(BaseModel):
+    overall_feedback: str
+    graded_answers: List[GradedAnswerResponse]
