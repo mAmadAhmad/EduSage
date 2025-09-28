@@ -32,11 +32,46 @@ def grade_submission_with_ai(submission_id: int, request: schemas.AIGradingReque
 
     grading_chain = vector_service.get_grading_chain()
 
-    ai_response = grading_chain.invoke({
+    ai_response_dict = grading_chain.invoke({
         "grading_criteria": request.grading_criteria,
         "submission_context": submission_context
     })
 
-    # In the final version, we would save this ai_response to our GradeReport table.
-    # For now, we return it directly.
+    # Convert the dictionary back into a Pydantic model for validation and use
+    ai_response = schemas.AIGradingResponse(**ai_response_dict)
+
+    # Save the report to the database
+    quiz_crud.create_grade_report(db=db, submission_id=submission_id, report_data=ai_response)
+
+    # Return the AI response to the frontend for immediate display
     return ai_response
+
+@router.get("/{submission_id}/report", response_model=schemas.GradeReportResponse, summary="Get the grade report for a submission")
+def read_grade_report(submission_id: int, db: Session = Depends(get_db)):
+    db_submission = quiz_crud.get_submission(db, submission_id=submission_id)
+    if not db_submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    # For now, we fetch the first AI-generated report.
+    # In the future, we could handle multiple reports (e.g., teacher-edited).
+    db_report = quiz_crud.get_grade_report(db, submission_id=submission_id)
+    if not db_report:
+        raise HTTPException(status_code=404, detail="Grade report not yet abailable for this submission.")
+
+    # Combine all the data into the response schema
+    graded_answers_data = []
+    for graded_answer in db_report.graded_answers:
+        graded_answers_data.append({
+            "question_text": graded_answer.answer.question.question_text,
+            "student_answer": graded_answer.answer.answer_text,
+            "correct_answer": graded_answer.answer.question.correct_answer,
+            "score": graded_answer.score,
+            "feedback": graded_answer.feedback,
+        })
+
+    return {
+        "student_name": db_submission.student_name,
+        "quiz_title": db_submission.quiz_session.quiz.title,
+        "overall_score": db_report.overall_score,
+        "overall_feedback": db_report.overall_feedback,
+        "graded_answers": graded_answers_data
+    }

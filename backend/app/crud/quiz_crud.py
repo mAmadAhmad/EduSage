@@ -162,3 +162,40 @@ def get_submission_details(db: Session, submission_id: int) -> dict | None:
         "quiz_title": quiz.title,
         "questions": questions_data,
     }
+
+# save the AI's grade report
+def create_grade_report(db: Session, submission_id: int,
+                        report_data: schemas.AIGradingResponse) -> quiz_models.GradeReport:
+    db_report = quiz_models.GradeReport(
+        submission_id=submission_id,
+        grader="AI",
+        overall_feedback=report_data.overall_feedback
+        # overall_score can be calculated and added here if needed
+    )
+    db.add(db_report)
+    db.commit()
+    db.refresh(db_report)  # Refresh the main report to get its ID
+
+    for graded_answer_data in report_data.graded_answers:
+        original_answer = db.query(quiz_models.Answer).filter(
+            quiz_models.Answer.submission_id == submission_id,
+            quiz_models.Answer.question_id == graded_answer_data.question_id
+        ).first()
+
+        if original_answer:
+            db_graded_answer = quiz_models.GradedAnswer(
+                report_id=db_report.id,
+                answer_id=original_answer.id,
+                score=graded_answer_data.score,
+                feedback=graded_answer_data.feedback
+            )
+            db.add(db_graded_answer)
+
+    db.commit()
+    db.refresh(db_report)  # THE FIX: Refresh the object you want the latest state of.
+    return db_report
+
+# grade report function
+def get_grade_report(db: Session, submission_id: int):
+    """Retrieves the first grade report for a given submission ID."""
+    return db.query(quiz_models.GradeReport).filter(quiz_models.GradeReport.submission_id == submission_id).first()

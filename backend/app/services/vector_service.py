@@ -61,7 +61,7 @@ def init_vector_service():
     print("Vector Service Initialized.")
 
     # Initialize llm once to be shared by all chains
-    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", google_api_key=settings.GOOGLE_API_KEY)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite-001", google_api_key=settings.GOOGLE_API_KEY)
 
     print("Base components initialized.")
 
@@ -81,88 +81,90 @@ def get_rag_chain():
         print("RAG chain initialized.")
     return rag_chain
 
+
 def get_quiz_chain():
-    """Returns the singleton Quiz Generation chain, initializing it if necessary."""
     global quiz_generation_chain
     if quiz_generation_chain is None:
         print("Initializing Quiz Generation chain for the first time...")
+        # UPDATED, MORE ROBUST PROMPT
         quiz_prompt_template = """
-                You are an expert educator and quiz creator. Your task is to generate a quiz based ONLY on the provided context.
-                Do not use any external knowledge.
-            
-                Follow these instructions precisely:
-                1.  Generate exactly {num_mcq} Multiple Choice Questions (MCQ).
-                2.  Generate exactly {num_short_answer} Short Answer questions.
-                3.  The quiz difficulty should be {difficulty}.
-                4.  For MCQs, provide 4 options, with one being the correct answer.
-                5.  For Short Answer questions, the "options" field should be null.
-                5.  Base every question and its correct answer strictly on the provided context.
-                6.  Return the output as a single, valid JSON object following this exact structure:
-                    {{
-                      "title": "Quiz on the provided context",
-                      "questions": [
-                        {{
-                          "question_text": "The text of the first question",
-                          "options": ["Option A", "Option B", "Option C", "Option D"],
-                          "correct_answer": "The correct option text"
-                        }},
-                        ...
-                      ]
-                    }}    
-                    ---
-                    ADDITIONAL INSTRUCTIONS FROM THE TEACHER:
-                    {custom_instructions}
-                    ---    
-                    
-                    Context:
-                    ---
-                    {context}
-                    ---
-                    """
+        You are an expert educator and quiz creator. Your task is to generate a quiz based ONLY on the provided context.
+        Do not use any external knowledge.
+
+        Follow these instructions precisely:
+        1.  Generate exactly {num_mcq} Multiple Choice Questions (MCQ).
+        2.  Generate exactly {num_short_answer} Short Answer questions.
+        3.  The quiz difficulty should be {difficulty}.
+        4.  For MCQs, provide exactly 4 options.
+        5.  For Short Answer questions, the "options" field MUST be null.
+        6.  Every question, including Short Answer ones, MUST have a "correct_answer" field containing the model answer.
+        7.  Base every question and its correct answer strictly on the provided context.
+        8.  Return the output as a single, valid JSON object following this exact structure:
+            {{
+              "title": "Quiz on the provided context",
+              "questions": [
+                {{
+                  "question_text": "Text of the first question...",
+                  "question_type": "MCQ", // or "Short Answer"
+                  "options": ["Option A", "Option B", "Option C", "Option D"], // or null
+                  "correct_answer": "The correct answer text..."
+                }}
+              ]
+            }}        
+
+            ADDITIONAL INSTRUCTIONS FROM THE TEACHER:
+            ---
+            {custom_instructions}
+            ---
+
+            Context:
+            ---
+            {context}
+            ---
+        """
         prompt = ChatPromptTemplate.from_template(quiz_prompt_template)
         quiz_generation_chain = prompt | llm | JsonOutputParser()
         print("Quiz Generation Chain initialized.")
     return quiz_generation_chain
 
+
 def get_grading_chain():
-    """Returns the singleton AI Grading chain, initializing it if necessary."""
     global grading_chain
     if grading_chain is None:
         print("Initializing AI Grading chain...")
-
-        # This prompt is the core of our AI grader
+        # UPDATED, MORE ROBUST PROMPT
         grading_prompt_template = """
-                You are an expert AI teaching assistant responsible for grading a student's quiz.
+        You are an expert AI teaching assistant...
+        Your task is to grade the provided submission based on the correct answers and the teacher's grading criteria.
+        For each question, provide an integer score and brief feedback.
 
-                Your task is to grade the provided submission based on the correct answers and the teacher's grading criteria.
+        GRADING CRITERIA:
+        ---
+        {grading_criteria}
+        ---
 
-                GRADING CRITERIA:
-                ---
-                {grading_criteria}
-                ---
+        QUIZ SUBMISSION:
+        ---
+        {submission_context}
+        ---
 
-                QUIZ SUBMISSION:
-                ---
-                {submission_context}
-                ---
-
-                Provide your response as a single, valid JSON object only. Do not include any other text or markdown formatting.
-                The JSON object must follow this exact structure:
+        Provide your response as a single, valid JSON object only. Do not include any other text or markdown formatting.
+        The JSON object must follow this exact structure, including all fields:
+        {{
+            "overall_feedback": "A brief summary of the student's performance.",
+            "graded_answers": [
                 {{
-                    "overall_feedback": "A brief summary of the student's performance.",
-                    "graded_answers": [
-                        {{
-                            "question_id": <the integer ID of the question>,
-                            "score": <an integer score for this answer>,
-                            "feedback": "Your specific feedback for this answer."
-                        }}
-                    ]
+                    "question_id": <the integer ID of the question>,
+                    "score": <an integer score for this answer>,
+                    "feedback": "Your specific feedback for this answer."
                 }}
-                """
+            ]
+        }}
+        """
         prompt = ChatPromptTemplate.from_template(grading_prompt_template)
         grading_chain = prompt | llm | JsonOutputParser()
         print("AI Grading chain initialized.")
-        return grading_chain
+    return grading_chain
 
 def close_vector_service():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
     """Closes the Weaviate client connection."""

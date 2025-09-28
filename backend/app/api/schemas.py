@@ -148,3 +148,23 @@ class GradedAnswerResponse(BaseModel):
 class AIGradingResponse(BaseModel):
     overall_feedback: str
     graded_answers: List[GradedAnswerResponse]
+
+# --- Schemas for Student Grade Report ---
+class GradedAnswerReport(BaseModel):
+    question_text: str
+    student_answer: str
+    correct_answer: str
+    score: int
+    feedback: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class GradeReportResponse(BaseModel):
+    student_name: str
+    quiz_title: str
+    overall_score: Optional[int] = None
+    overall_feedback: Optional[str] = None
+    graded_answers: List[GradedAnswerReport]
+
+    model_config = ConfigDict(from_attributes=True)
+

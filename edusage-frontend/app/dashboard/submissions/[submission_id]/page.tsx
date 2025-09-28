@@ -1,5 +1,3 @@
-// app/dashboard/submissions/[submission_id]/page.tsx
-
 import GradingInterface from './GradingInterface';
 
 // Define the type for the data we fetch
