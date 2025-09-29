@@ -168,3 +168,36 @@ class GradeReportResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+# --- Schemas for Lesson Plan Generation ---
+class Slide(BaseModel):
+    title: str
+    bullet_points: List[str]
+    speaker_notes: str
+
+class LessonPlanRequest(BaseModel):
+    source_document: str
+    instructions: str="Create a standard 45-minute lesson plan."
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+
+class LessonPlanResponse(BaseModel):
+    lesson_title: str
+    learning_objectives: List[str]
+    key_concepts: List[str]
+    slides: List[Slide]
+    review_questions: List[QuestionCreate]
+
+class LessonPlanBase(BaseModel):
+    lesson_title: str
+    learning_objectives: List[str]
+    key_concepts: List[str]
+    slides: List[Slide]
+    review_questions: List[QuestionCreate]
+
+class LessonPlanCreate(LessonPlanBase):
+    pass
+
+# This is what the API will now return
+class LessonPlan(LessonPlanBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)

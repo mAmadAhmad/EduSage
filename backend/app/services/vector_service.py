@@ -19,6 +19,7 @@ llm = None  # We'll initialize the LLM once and share it.
 rag_chain = None
 quiz_generation_chain = None
 grading_chain = None
+lesson_plan_chain = None
 
 
 def init_vector_service():
@@ -64,6 +65,15 @@ def init_vector_service():
     llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite-001", google_api_key=settings.GOOGLE_API_KEY)
 
     print("Base components initialized.")
+
+
+def close_vector_service():
+    """Closes the Weaviate client connection."""
+    global weaviate_client
+    if weaviate_client:
+        weaviate_client.close()
+        print("Weaviate connection closed.")
+
 
 def get_rag_chain():
     """Returns the singleton RAG chain, initializing it if necessary."""
@@ -166,9 +176,46 @@ def get_grading_chain():
         print("AI Grading chain initialized.")
     return grading_chain
 
-def close_vector_service():                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
-    """Closes the Weaviate client connection."""
-    global weaviate_client
-    if weaviate_client:
-        weaviate_client.close()
-        print("Weaviate connection closed.")
+
+def get_lesson_plan_chain():
+    global lesson_plan_chain
+    if lesson_plan_chain is None:
+        print("Initializing Lesson Plan chain...")
+        lesson_plan_prompt_template = """
+                You are an expert instructional designer. Your task is to create a complete lesson plan and presentation based ONLY on the provided context.
+                Follow the teacher's instructions carefully.
+
+                TEACHER'S INSTRUCTIONS:
+                ---
+                {instructions}
+                ---
+
+                CONTEXT:
+                ---
+                {context}
+                ---
+
+                Generate a single, valid JSON object following this exact structure:
+                {{
+                    "lesson_title": "A concise and engaging title for the lesson",
+                    "learning_objectives": ["Objective 1", "Objective 2"],
+                    "key_concepts": ["Concept 1 with brief definition", "Concept 2 with brief definition"],
+                    "slides": [
+                        {{
+                            "title": "Title of Slide 1",
+                            "bullet_points": ["Point 1", "Point 2"],
+                            "speaker_notes": "Private notes for the teacher for this slide."
+                        }}
+                    ],
+                    "review_questions": [
+                        {{
+                          "question_text": "...", "question_type": "...", "options": [...], "correct_answer": "..."
+                        }}
+                    ]
+                }}
+                """
+        prompt = ChatPromptTemplate.from_template(lesson_plan_prompt_template)
+        lesson_plan_chain = prompt | llm | JsonOutputParser()
+        print("Lesson Plan chain initialized.")
+    return lesson_plan_chain
+
