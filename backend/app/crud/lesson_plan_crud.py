@@ -29,3 +29,31 @@ def create_lesson_plan(db: Session, lesson_plan: schemas.LessonPlanCreate) -> le
 
 def get_lesson_plan(db: Session, lesson_plan_id: int):
     return db.query(lesson_plan_models.LessonPlan).filter(lesson_plan_models.LessonPlan.id == lesson_plan_id).first()
+
+
+def update_lesson_plan(db: Session, lesson_plan_id: int, lesson_plan: schemas.LessonPlanUpdate):
+    db_lesson_plan = get_lesson_plan(db, lesson_plan_id=lesson_plan_id)
+    if not db_lesson_plan:
+        return None
+
+    # Update main fields
+    db_lesson_plan.lesson_title = lesson_plan.lesson_title
+    db_lesson_plan.learning_objectives = lesson_plan.learning_objectives
+    db_lesson_plan.key_concepts = lesson_plan.key_concepts
+    db_lesson_plan.review_questions = [q.model_dump() for q in lesson_plan.review_questions]
+
+    # Delete old slides
+    for slide in db_lesson_plan.slides:
+        db.delete(slide)
+
+    # Add new slides
+    for slide_data in lesson_plan.slides:
+        db_slide = lesson_plan_models.Slide(
+            lesson_plan_id=db_lesson_plan.id,
+            **slide_data.model_dump()
+        )
+        db.add(db_slide)
+
+    db.commit()
+    db.refresh(db_lesson_plan)
+    return db_lesson_plan

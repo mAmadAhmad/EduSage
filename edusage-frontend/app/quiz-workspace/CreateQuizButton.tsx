@@ -37,7 +37,7 @@ export default function CreateQuizButton() {
       }
 
       const newQuiz = await res.json();
-      router.push(`/dashboard/quiz/${newQuiz.id}`);
+      router.push(`/quiz-workspace/quiz/${newQuiz.id}`);
 
     } catch (error) {
       console.error(error);

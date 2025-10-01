@@ -61,3 +61,10 @@ def read_lesson_plan(lesson_plan_id: int, db: Session = Depends(get_db)):
     if db_lesson_plan is None:
         raise HTTPException(status_code=404, detail="Lesson Plan not found")
     return db_lesson_plan
+
+@router.put("/lesson-plans/{lesson_plan_id}", response_model=schemas.LessonPlan, summary="Update a Lesson Plan")
+def update_lesson_plan(lesson_plan_id: int, lesson_plan: schemas.LessonPlanUpdate, db: Session = Depends(get_db)):
+    db_lesson_plan = lesson_plan_crud.update_lesson_plan(db, lesson_plan_id=lesson_plan_id, lesson_plan=lesson_plan)
+    if db_lesson_plan is None:
+        raise HTTPException(status_code=404, detail="Lesson Plan not found")
+    return db_lesson_plan

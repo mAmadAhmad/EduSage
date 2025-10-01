@@ -201,3 +201,10 @@ class LessonPlanCreate(LessonPlanBase):
 class LessonPlan(LessonPlanBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
+
+
+class SlideUpdate(Slide):
+    pass
+
+class LessonPlanUpdate(LessonPlanBase):
+    slides: List[SlideUpdate]

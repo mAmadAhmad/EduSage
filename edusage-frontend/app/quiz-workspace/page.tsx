@@ -3,6 +3,8 @@ import Link from 'next/link';
 import CreateQuizButton from './CreateQuizButton';
 import AIQuizGenerator from './AIQuizGenerator';
 import QuizActions from './QuizActions';
+import AILessonPlanGenerator from './AILessonPlanGenerator'; 
+
 
 // Define a type for our Quiz data structure to match the backend
 interface Question {
@@ -48,6 +50,7 @@ export default async function DashboardPage() {
         <div className='flex justify-between items-center mb-8'>
         <h1 className="text-4xl font-bold text-gray-800 mb-8">Teacher Dashboard</h1>
           <div className="flex gap-4">
+            <AILessonPlanGenerator />
             <CreateQuizButton />
             <AIQuizGenerator />
           </div>
