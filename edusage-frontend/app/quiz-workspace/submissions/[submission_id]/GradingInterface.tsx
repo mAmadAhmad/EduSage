@@ -62,7 +62,7 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
     return (
         <div className="w-full max-w-4xl">
             <div className="mb-8">
-                <Link href={`/dashboard/quiz/${details.quiz_id}/submissions`} className="text-blue-600 hover:underline">
+                <Link href={`/quiz-workspace/quiz/${details.quiz_id}/submissions`} className="text-blue-600 hover:underline">
                     &larr; Back to All Submissions
                 </Link>
                 <h1 className="text-4xl font-bold mt-2">Grading Submission</h1>

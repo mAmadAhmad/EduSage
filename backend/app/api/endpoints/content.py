@@ -7,6 +7,7 @@ from app.services import vector_service
 from app.core.config import settings
 from app.crud import lesson_plan_crud
 from sqlalchemy.orm import Session
+from typing import List
 
 
 router = APIRouter()
@@ -68,3 +69,15 @@ def update_lesson_plan(lesson_plan_id: int, lesson_plan: schemas.LessonPlanUpdat
     if db_lesson_plan is None:
         raise HTTPException(status_code=404, detail="Lesson Plan not found")
     return db_lesson_plan
+
+@router.get("/lesson-plans/", response_model=List[schemas.LessonPlanInfo], summary="Get a list of all Lesson Plans")
+def read_lesson_plans(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    lesson_plans = lesson_plan_crud.get_lesson_plans(db, skip=skip, limit=limit)
+    return lesson_plans
+
+@router.delete("/lesson-plans/{lesson_plan_id}", summary="Delete a Lesson Plan")
+def delete_lesson_plan(lesson_plan_id: int, db: Session = Depends(get_db)):
+    db_lesson_plan = lesson_plan_crud.delete_lesson_plan(db, lesson_plan_id=lesson_plan_id)
+    if db_lesson_plan is None:
+        raise HTTPException(status_code=404, detail="Lesson Plan not found")
+    return {"detail": "Successfully deleted lesson plan"}

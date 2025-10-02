@@ -32,7 +32,7 @@ export default function QuizActions({ quizId }: { quizId: number }) {
   return (
     <div className="flex items-center gap-4">
       {/* NEW: Add the Submissions link */}
-      <Link href={`/dashboard/quiz/${quizId}/submissions`} className="text-sm font-semibold text-green-600 hover:underline">
+      <Link href={`/quiz-workspace/quiz/${quizId}/submissions`} className="text-sm font-semibold text-green-600 hover:underline">
         Submissions
       </Link>
       <button onClick={handleShare} className="text-sm text-blue-600 hover:underline">Share</button>

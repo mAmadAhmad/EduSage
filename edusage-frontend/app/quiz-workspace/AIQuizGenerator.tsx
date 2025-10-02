@@ -46,7 +46,7 @@ export default function AIQuizGenerator() {
       
       const newQuiz = await saveRes.json();
       setIsOpen(false);
-      router.push(`/dashboard/quiz/${newQuiz.id}`);
+      router.push(`/quiz-workspace/quiz/${newQuiz.id}`);
     } catch (error) {
       console.error(error);
       alert(error instanceof Error ? error.message : 'An unknown error occurred.');

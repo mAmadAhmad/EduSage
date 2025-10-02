@@ -32,7 +32,7 @@ export default async function SubmissionsPage({ params: { quiz_id } }: { params:
     <main className="flex min-h-screen flex-col items-center p-24 bg-gray-50">
       <div className="w-full max-w-4xl">
         <div className="mb-8">
-            <Link href="/dashboard" className="text-blue-600 hover:underline">
+            <Link href="/quiz-workspace" className="text-blue-600 hover:underline">
                 &larr; Back to Dashboard
             </Link>
             <h1 className="text-4xl font-bold text-gray-800 mt-2">Quiz Submissions</h1>
@@ -49,7 +49,7 @@ export default async function SubmissionsPage({ params: { quiz_id } }: { params:
                   </div>
                   <p className="text-gray-600">{submission.answers.length} answers submitted</p>
                   {/* In the future, this button will lead to the grading view */}
-                  <Link href={`/dashboard/submissions/${submission.id}`} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700">
+                  <Link href={`/quiz-workspace/submissions/${submission.id}`} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700">
                 View & Grade
                 </Link>
                 </li>

@@ -4,7 +4,6 @@ import { useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
 
-// This component is a simplified version of the AIQuizGenerator
 export default function AILessonPlanGenerator() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,8 +25,9 @@ export default function AILessonPlanGenerator() {
       
       const newLessonPlan = await res.json();
       setIsOpen(false);
-      // Redirect to the new viewer page we are about to create
-      router.push(`/dashboard/lesson-plans/${newLessonPlan.id}`);
+      
+      // THE FIX: Update the redirect path to the correct workspace
+      router.push(`/slide-workspace/lesson-plans/${newLessonPlan.id}`);
 
     } catch (error) {
       alert(error instanceof Error ? error.message : 'An unknown error occurred.');
@@ -35,7 +35,6 @@ export default function AILessonPlanGenerator() {
       setIsLoading(false);
     }
   };
-
   return (
     <>
       <button onClick={() => setIsOpen(true)} className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">

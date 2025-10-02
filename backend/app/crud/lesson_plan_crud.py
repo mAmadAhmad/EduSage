@@ -2,6 +2,7 @@
 from sqlalchemy.orm import Session
 from app.models import lesson_plan_models
 from app.api import schemas
+from typing import List
 
 
 def create_lesson_plan(db: Session, lesson_plan: schemas.LessonPlanCreate) -> lesson_plan_models.LessonPlan:
@@ -56,4 +57,14 @@ def update_lesson_plan(db: Session, lesson_plan_id: int, lesson_plan: schemas.Le
 
     db.commit()
     db.refresh(db_lesson_plan)
+    return db_lesson_plan
+
+def get_lesson_plans(db: Session, skip: int = 0, limit: int = 100) -> List[lesson_plan_models.LessonPlan]:
+    return db.query(lesson_plan_models.LessonPlan).offset(skip).limit(limit).all()
+
+def delete_lesson_plan(db: Session, lesson_plan_id: int):
+    db_lesson_plan = get_lesson_plan(db, lesson_plan_id=lesson_plan_id)
+    if db_lesson_plan:
+        db.delete(db_lesson_plan)
+        db.commit()
     return db_lesson_plan

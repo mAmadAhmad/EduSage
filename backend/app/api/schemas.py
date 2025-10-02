@@ -208,3 +208,10 @@ class SlideUpdate(Slide):
 
 class LessonPlanUpdate(LessonPlanBase):
     slides: List[SlideUpdate]
+
+
+class LessonPlanInfo(BaseModel):
+    id: int
+    lesson_title: str
+
+    model_config = ConfigDict(from_attributes=True)
