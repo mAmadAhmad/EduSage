@@ -76,7 +76,7 @@ export default function AIQuizGenerator() {
                   <div>
                     <label htmlFor="sourceDoc" className="block text-sm font-medium text-gray-700">Source Document</label>
                     <input type="text" id="sourceDoc" value={sourceDoc} onChange={(e) => setSourceDoc(e.target.value)}
-                           className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm"/>
+                           className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm px-2"/>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -84,13 +84,13 @@ export default function AIQuizGenerator() {
                       <label htmlFor="pageStart" className="block text-sm font-medium text-gray-700">Page Start (Optional)</label>
                       <input type="number" id="pageStart" value={pageStart}
                              onChange={(e) => setPageStart(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                             className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm"/>
+                             className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm px-2"/>
                     </div>
                     <div>
                       <label htmlFor="pageEnd" className="block text-sm font-medium text-gray-700">Page End (Optional)</label>
                       <input type="number" id="pageEnd" value={pageEnd}
                              onChange={(e) => setPageEnd(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                             className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm"/>
+                             className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm px-2"/>
                     </div>
                   </div>
 
@@ -99,13 +99,13 @@ export default function AIQuizGenerator() {
                       <label htmlFor="numMcq" className="block text-sm font-medium text-gray-700">Number of MCQs</label>
                       <input type="number" id="numMcq" value={numMcq}
                              onChange={(e) => setNumMcq(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                             className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm"/>
+                             className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm px-2"/>
                     </div>
                     <div>
                       <label htmlFor="numShortAnswer" className="block text-sm font-medium text-gray-700">Number of Short Questions</label>
                       <input type="number" id="numShortAnswer" value={numShortAnswer}
                              onChange={(e) => setNumShortAnswer(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                             className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm"/>
+                             className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm px-2"/>
                     </div>
                   </div>
 
@@ -114,7 +114,7 @@ export default function AIQuizGenerator() {
                     <textarea id="customInstructions" value={customInstructions}
                               onChange={(e) => setCustomInstructions(e.target.value)}
                               rows={3} placeholder="e.g., Focus on definitions."
-                              className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm"/>
+                              className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm px-2"/>
                   </div>
                   
                   <div className="mt-6 flex justify-end gap-4">

@@ -6,9 +6,9 @@ logging.getLogger("uvicorn").setLevel(logging.WARNING)
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.services.vector_service import init_vector_service, close_vector_service
-from app.api.endpoints import documents, quizzes, student, submissions, content
+from app.api.endpoints import documents, quizzes, student, submissions, content, auth
 from app.db import session
-from app.models import quiz_models
+from app.models import quiz_models, user_models
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 async def lifespan(_app: FastAPI):
     # On startup
     print("Creating database tables...")
+    user_models.Base.metadata.create_all(bind=session.engine)
     quiz_models.Base.metadata.create_all(bind=session.engine)
     init_vector_service()
     yield
@@ -45,6 +46,7 @@ app.add_middleware(
 )
 
 # Include the API router
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(documents.router, prefix="/api/v1/docs", tags=["Document and RAQ Ops"])
 app.include_router(quizzes.router, prefix="/api/v1/quizzes", tags=["Quiz Management"])
 app.include_router(student.router, prefix="/api/v1/take-quiz", tags=["Student Quiz Access"])

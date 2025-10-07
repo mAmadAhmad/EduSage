@@ -65,7 +65,7 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
                 <Link href={`/quiz-workspace/quiz/${details.quiz_id}/submissions`} className="text-blue-600 hover:underline">
                     &larr; Back to All Submissions
                 </Link>
-                <h1 className="text-4xl font-bold mt-2">Grading Submission</h1>
+                <h1 className="text-4xl font-bold mt-2 text-gray-900">Grading Submission</h1>
                 <p className="text-xl text-gray-600">Student: <strong>{details.student_name}</strong></p>
                 <p className="text-md text-gray-500">Quiz: {details.quiz_title}</p>
             </div>

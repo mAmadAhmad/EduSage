@@ -11,4 +11,9 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", env_file_encoding="utf-8")
 
+    # Generate a secret key with: openssl rand -hex 32
+    SECRET_KEY: str = "8758d8240360190d9cecae4af7c20805708c33466f8b79f894f37da8f42440ef"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
 settings = Settings()

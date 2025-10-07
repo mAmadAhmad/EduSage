@@ -88,12 +88,12 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
                   <div>
                     <label htmlFor="studentName" className="block text-sm font-medium text-gray-700">Full Name</label>
                     <input type="text" id="studentName" value={studentName} onChange={(e) => setStudentName(e.target.value)}
-                           className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm"/>
+                           className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm px-3"/>
                   </div>
                   <div>
                     <label htmlFor="studentRollNo" className="block text-sm font-medium text-gray-700">Roll Number (Optional)</label>
                     <input type="text" id="studentRollNo" value={studentRollNo} onChange={(e) => setStudentRollNo(e.target.value)}
-                           className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm"/>
+                           className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm px-3"/>
                   </div>
                 </div>
                 <div className="mt-6">

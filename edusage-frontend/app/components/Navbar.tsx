@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import SignupPage from '../signup/page';
+import LoginPage from '../login/page';
 
 export function Navbar() {
   return (
@@ -17,6 +19,8 @@ export function Navbar() {
             <Link href="/slide-workspace" className="text-gray-600 hover:bg-gray-100 px-3 py-2 rounded-md text-sm font-medium">
               Slide Workspace
             </Link>
+             <Link href="/login" className="text-gray-600 hover:bg-gray-100 px-3 py-2 rounded-md text-sm font-medium">Login</Link>
+            <Link href="/signup" className="px-3 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700">Sign Up</Link>
           </div>
         </div>
       </div>
