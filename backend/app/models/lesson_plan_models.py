@@ -12,6 +12,7 @@ class LessonPlan(Base):
     learning_objectives = Column(JSON)
     key_concepts = Column(JSON)
     review_questions = Column(JSON, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
 
     slides = relationship("Slide", back_populates="lesson_plan", cascade="all, delete-orphan")
     # We can also link the review questions if we store them separately

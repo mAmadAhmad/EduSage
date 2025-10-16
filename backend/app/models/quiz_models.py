@@ -13,6 +13,7 @@ class Quiz(Base):
     instructions = Column(Text, nullable=True)
     # In the future, this would be a ForeignKey to a User model
     teacher_id = Column(Integer, default=1) # Placeholder teacher ID
+    user_id = Column(Integer, ForeignKey("users.id"))
 
     questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
 
@@ -46,6 +47,7 @@ class Submission(Base):
     quiz_session_id = Column(Integer, ForeignKey("quiz_sessions.id"))
     student_name = Column(String)
     student_roll_no = Column(String, nullable=True)
+    student_id = Column(Integer, ForeignKey("users.id"))
 
     quiz_session = relationship("QuizSession")
     answers = relationship("Answer", back_populates="submission", cascade="all, delete-orphan")

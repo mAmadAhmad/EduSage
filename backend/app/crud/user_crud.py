@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 from app.models import user_models
 from app.api import schemas
-from app.services.auth_service import get_password_hash
+from app.services.security import get_password_hash
 
 def get_user_by_username(db: Session, username: str):
     return db.query(user_models.User).filter(user_models.User.username == username).first()

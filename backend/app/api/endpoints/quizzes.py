@@ -1,83 +1,60 @@
-# app/api/endpoints/quizzes.py
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
 from app.api import schemas
 from app.crud import quiz_crud
-from app.db.session import SessionLocal
+from app.db.dependencies import get_db
+# Import the security dependency
+from app.services.auth_service import get_current_user
 
 router = APIRouter()
 
-# Dependency to get a DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
-@router.post("/", response_model=schemas.Quiz, summary="Create a new Quiz")
-def create_quiz(quiz: schemas.QuizCreate, db: Session = Depends(get_db)):
-    """
-    Create a new quiz with its questions.
-    This can be used to save a manually created quiz or a teacher-validated,
-    AI-generated quiz.
-    """
-    return quiz_crud.create_quiz(db=db, quiz=quiz)
+@router.post("/", response_model=schemas.Quiz, summary="Create a new Quiz for the current user")
+def create_quiz(quiz: schemas.QuizCreate, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+    # Pass the user's ID to the creation function
+    return quiz_crud.create_quiz(db=db, quiz=quiz, user_id=current_user.id)
 
-@router.get("/", response_model=List[schemas.Quiz], summary="List all Quizzes")
-def read_quizzes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """
-    Retrieve a list of all quizzes.
-    """
-    quizzes = quiz_crud.get_quizzes(db, skip=skip, limit=limit)
-    return quizzes
+@router.get("/", response_model=List[schemas.Quiz], summary="List all Quizzes for the current user")
+def read_quizzes(db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+    # Fetch quizzes scoped to the current user
+    return quiz_crud.get_quizzes(db=db, user_id=current_user.id)
 
 @router.get("/{quiz_id}", response_model=schemas.Quiz, summary="Get a single quiz by ID")
-def read_quiz(quiz_id: int, db: Session = Depends(get_db)):
-    """
-    Retrieve a specific quiz by its unique ID, including all its questions.
-    """
-    db_quiz = quiz_crud.get_quiz(db, quiz_id=quiz_id)
+def read_quiz(quiz_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+    # Fetch a single quiz, ensuring it belongs to the current user
+    db_quiz = quiz_crud.get_quiz(db, quiz_id=quiz_id, user_id=current_user.id)
     if db_quiz is None:
         raise HTTPException(status_code=404, detail="Quiz not found")
     return db_quiz
 
 @router.put("/{quiz_id}", response_model=schemas.Quiz, summary="Update a Quiz")
-def update_quiz(quiz_id: int, quiz: schemas.QuizUpdate, db: Session = Depends(get_db)):
-    """
-    Update a quiz's title, instructions, and its entire set of questions.
-    """
-    db_quiz = quiz_crud.update_quiz(db=db, quiz_id=quiz_id, quiz=quiz)
+def update_quiz(quiz_id: int, quiz: schemas.QuizUpdate, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+    # Update a quiz, ensuring it belongs to the current user
+    db_quiz = quiz_crud.update_quiz(db=db, quiz_id=quiz_id, quiz=quiz, user_id=current_user.id)
     if db_quiz is None:
         raise HTTPException(status_code=404, detail="Quiz not found")
     return db_quiz
 
 @router.delete("/{quiz_id}", summary="Delete a Quiz")
-def delete_quiz(quiz_id: int, db: Session = Depends(get_db)):
-    """
-    Delete a quiz and all of its associated questions.
-    """
-    db_quiz = quiz_crud.delete_quiz(db=db, quiz_id=quiz_id)
+def delete_quiz(quiz_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+    # Delete a quiz, ensuring it belongs to the current user
+    db_quiz = quiz_crud.delete_quiz(db=db, quiz_id=quiz_id, user_id=current_user.id)
     if db_quiz is None:
         raise HTTPException(status_code=404, detail="Quiz not found")
     return {"detail": f"Successfully deleted quiz with id {quiz_id}"}
 
-
 @router.post("/{quiz_id}/share", summary="Create a shareable session for a Quiz")
-def share_quiz(quiz_id: int, db: Session = Depends(get_db)):
-    db_quiz = quiz_crud.get_quiz(db, quiz_id=quiz_id)
+def share_quiz(quiz_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+    # Ensure the user owns the quiz they are trying to share
+    db_quiz = quiz_crud.get_quiz(db, quiz_id=quiz_id, user_id=current_user.id)
     if db_quiz is None:
         raise HTTPException(status_code=404, detail="Quiz not found")
-
     session = quiz_crud.create_quiz_session(db=db, quiz_id=quiz_id)
     return {"share_code": session.share_code}
 
 @router.get("/{quiz_id}/submissions", response_model=List[schemas.Submission], summary="Get all submissions for a Quiz")
-def read_submissions_for_quiz(quiz_id: int, db: Session = Depends(get_db)):
-    """
-    Retrieve a list of all submissions for a specific quiz.
-    """
-    submissions = quiz_crud.get_submissions_for_quiz(db, quiz_id=quiz_id)
+def read_submissions_for_quiz(quiz_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+    # Fetch submissions, ensuring they are for a quiz owned by the current user
+    submissions = quiz_crud.get_submissions_for_quiz(db, quiz_id=quiz_id, user_id=current_user.id)
     return submissions
