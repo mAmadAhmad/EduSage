@@ -1,6 +1,4 @@
 import Link from 'next/link';
-import SignupPage from '../signup/page';
-import LoginPage from '../login/page';
 
 export function Navbar() {
   return (

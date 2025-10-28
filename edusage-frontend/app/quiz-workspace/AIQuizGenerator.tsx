@@ -20,6 +20,15 @@ export default function AIQuizGenerator() {
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+
+    // --- Retrieve the token just before making API calls ---
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) {
+        alert('You are not logged in.');
+        setIsLoading(false);
+        return; // Stop if not logged in
+    }
+    
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
       const payload = {
@@ -32,21 +41,36 @@ export default function AIQuizGenerator() {
         custom_instructions: customInstructions || "Please generate a standard quiz."
       };
 
+      // Step 1: Generate (Doesn't strictly need auth currently, but good practice to add it)
       const generateRes = await fetch(`${backendUrl}/docs/quiz/generate/`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // Add header here too
+        },
+        body: JSON.stringify(payload),
       });
       if (!generateRes.ok) throw new Error('Failed to generate quiz content.');
-      
       const generatedQuiz = await generateRes.json();
-      
+
+      // Step 2: Save (This endpoint DEFINITELY needs auth)
       const saveRes = await fetch(`${backendUrl}/quizzes/`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(generatedQuiz),
+        method: 'POST',
+        // --- ADD THE Authorization HEADER HERE ---
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(generatedQuiz),
       });
       if (!saveRes.ok) throw new Error('Failed to save the new quiz.');
-      
+
+      // Step 3: Redirect
       const newQuiz = await saveRes.json();
       setIsOpen(false);
       router.push(`/quiz-workspace/quiz/${newQuiz.id}`);
+      router.refresh(); // Tell Next.js to re-fetch the dashboard data
+
     } catch (error) {
       console.error(error);
       alert(error instanceof Error ? error.message : 'An unknown error occurred.');

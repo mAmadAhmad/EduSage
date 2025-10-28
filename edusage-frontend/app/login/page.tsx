@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation'; 
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -8,6 +9,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,9 +34,12 @@ export default function LoginPage() {
       }
 
       const data = await res.json();
-      // For now, we just alert the token to confirm it works.
-      // In the next step, we'll store this securely.
-      alert(`Login successful! Your token is: ${data.access_token}`);
+
+      if (typeof window !== 'undefined') { 
+          localStorage.setItem('accessToken', data.access_token);
+      }
+
+      router.push('./quiz-workspace'); 
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');

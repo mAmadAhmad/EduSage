@@ -1,37 +1,48 @@
+'use client'; // Make it a Client Component
 
+import { useState, useEffect } from 'react';
 import LessonPlanInterface from './LessonPlanInterface';
 
-// Define the type for the data we fetch
-interface LessonPlan {
-    id: number;
-    lesson_title: string;
-    learning_objectives: string[];
-    key_concepts: string[];
-    slides: any[];
-}
+// Keep the interface
+interface Slide { title: string; bullet_points: string[]; speaker_notes: string; }
+interface LessonPlan { id: number; lesson_title: string; learning_objectives: string[]; key_concepts: string[]; slides: Slide[]; }
 
-async function fetchLessonPlan(lessonPlanId: string): Promise<LessonPlan | null> {
-    try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
-        const res = await fetch(`${backendUrl}/content/lesson-plans/${lessonPlanId}`, { cache: 'no-store' });
-        if (!res.ok) throw new Error('Failed to fetch lesson plan');
-        return res.json();
-    } catch (error) {
-        console.error(error);
-        return null;
-    }
-}
 
-export default async function LessonPlanPage({ params: { lessonPlanId } }: { params: { lessonPlanId: string } }) {
-    const lessonPlan = await fetchLessonPlan(lessonPlanId);
+export default function LessonPlanPage({ params }: { params: { lessonPlanId: string } }) {
+    const [lessonPlan, setLessonPlan] = useState<LessonPlan | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    if (!lessonPlan) {
-        return (
-            <main className="flex min-h-screen flex-col items-center justify-center p-24">
-                <h1 className="text-2xl font-bold">Lesson Plan Not Found</h1>
-            </main>
-        );
-    }
+    useEffect(() => {
+        const fetchLessonPlan = async () => {
+             const token = localStorage.getItem('accessToken');
+             if (!token) {
+                setError('Not logged in.'); setLoading(false); return;
+             }
+            try {
+                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
+                const res = await fetch(`${backendUrl}/content/lesson-plans/${params.lessonPlanId}`, {
+                    cache: 'no-store',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    if (res.status === 401) throw new Error('Unauthorized');
+                    throw new Error('Failed to fetch lesson plan');
+                }
+                setLessonPlan(await res.json());
+            } catch (err) {
+                 setError(err instanceof Error ? err.message : 'Failed to load lesson plan');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchLessonPlan();
+    }, [params.lessonPlanId]);
+
+
+    if (loading) return <p className="text-center mt-20">Loading Lesson Plan...</p>;
+    if (error) return <p className="text-center mt-20 text-red-500">Error: {error}</p>;
+    if (!lessonPlan) return <p className="text-center mt-20">Lesson Plan Not Found</p>;
 
     return (
         <main className="flex min-h-screen flex-col items-center p-12 bg-gray-100">

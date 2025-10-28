@@ -36,29 +36,38 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
   const handleSubmit = async () => {
     if (!confirm('Are you sure you want to submit your quiz?')) return;
     setIsSubmitting(true);
+
+    // 1. Get the token (Student needs to be logged in to submit)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) {
+        alert('Please log in to submit your quiz.');
+        setIsSubmitting(false);
+        router.push('/login'); // Redirect to login if not logged in
+        return;
+    }
     
     const formattedAnswers = Object.entries(answers).map(([questionId, answerText]) => ({
-      question_id: parseInt(questionId),
-      answer_text: answerText,
+      question_id: parseInt(questionId), answer_text: answerText,
     }));
-
     const submissionPayload = {
-      student_name: studentName,
-      student_roll_no: studentRollNo,
-      answers: formattedAnswers,
+      student_name: studentName, student_roll_no: studentRollNo, answers: formattedAnswers,
     };
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
-      // Use the share_code from the initialQuiz or params to submit
-      const shareCode = (initialQuiz as any).share_code || window.location.pathname.split('/').pop();
+      const shareCode = window.location.pathname.split('/').pop();
       const res = await fetch(`${backendUrl}/take-quiz/${shareCode}/submit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // 2. Add the Authorization header
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(submissionPayload),
       });
 
       if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
         const errorData = await res.json();
         throw new Error(errorData.detail || 'Failed to submit quiz');
       }
@@ -67,6 +76,7 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
       router.push('/');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'An unknown error occurred.');
+    } finally {
       setIsSubmitting(false);
     }
   };

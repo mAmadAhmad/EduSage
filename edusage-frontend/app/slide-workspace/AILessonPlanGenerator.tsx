@@ -13,24 +13,39 @@ export default function AILessonPlanGenerator() {
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+
+    // 1. Get the token
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) {
+        alert('Please log in to generate a lesson plan.');
+        setIsLoading(false);
+        return;
+    }
+
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
       const res = await fetch(`${backendUrl}/content/generate-lesson`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source_document: sourceDoc }),
+        // 2. Add the Authorization header
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ source_document: sourceDoc }), // Add other params as needed
       });
 
-      if (!res.ok) throw new Error('Failed to generate lesson plan.');
+      if (!res.ok) {
+         if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
+         throw new Error('Failed to generate lesson plan.');
+      }
       
       const newLessonPlan = await res.json();
       setIsOpen(false);
-      
-      // THE FIX: Update the redirect path to the correct workspace
       router.push(`/slide-workspace/lesson-plans/${newLessonPlan.id}`);
+      router.refresh(); // Refresh dashboard
 
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'An unknown error occurred.');
+       alert(error instanceof Error ? error.message : 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }

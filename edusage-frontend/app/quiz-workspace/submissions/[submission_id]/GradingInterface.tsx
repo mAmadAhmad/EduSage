@@ -39,17 +39,33 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
     const handleAIGrade = async () => {
         setIsGrading(true);
         setGradingReport(null);
+
+        // 1. Get the token
+        const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+        if (!token) {
+            alert('Please log in to grade.');
+            setIsGrading(false);
+            return;
+        }
+
         try {
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
             const res = await fetch(`${backendUrl}/submissions/${initialDetails.submission_id}/grade`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                 // 2. Add the Authorization header
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ grading_criteria: gradingCriteria }),
             });
-            if (!res.ok) throw new Error('AI grading failed');
+            if (!res.ok) {
+                if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
+                throw new Error('AI grading failed');
+            }
             setGradingReport(await res.json());
         } catch (error) {
-            alert('An error occurred during AI grading.');
+            alert(error instanceof Error ? error.message : 'An error occurred during AI grading.');
         } finally {
             setIsGrading(false);
         }

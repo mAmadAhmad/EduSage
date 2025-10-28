@@ -1,26 +1,38 @@
 'use client';
 import { useRouter } from 'next/navigation';
 
-export function LessonPlanActions({ lessonPlanId }: { lessonPlanId: number }) {
+export default function LessonPlanActions({ lessonPlanId }: { lessonPlanId: number }) {
   const router = useRouter();
 
   const handleDelete = async () => {
-    // A simple confirmation dialog
     if (!confirm('Are you sure you want to delete this lesson plan?')) return;
+
+    // 1. Get the token
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) {
+        alert('Please log in to delete.');
+        return;
+    }
     
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
-      const res = await fetch(`${backendUrl}/content/lesson-plans/${lessonPlanId}`, { method: 'DELETE' });
+      const res = await fetch(`${backendUrl}/content/lesson-plans/${lessonPlanId}`, {
+          method: 'DELETE',
+          // 2. Add the Authorization header
+          headers: { 'Authorization': `Bearer ${token}` }
+      });
       
-      if (!res.ok) throw new Error('Failed to delete lesson plan');
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
+        throw new Error('Failed to delete lesson plan');
+      }
       
-      // Refresh the page to update the list of lesson plans
-      router.refresh(); 
+      router.refresh();
     } catch (error) {
-      alert('Could not delete the lesson plan.');
+       alert(error instanceof Error ? error.message : 'Could not delete the lesson plan.');
     }
   };
-
+  
   return (
     <div className="flex gap-2">
       <button onClick={handleDelete} className="text-sm font-semibold text-red-600 hover:underline">

@@ -26,18 +26,34 @@ export default function LessonPlanInterface({ initialLessonPlan }: { initialLess
     const handleSave = async (e: FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
+
+        // 1. Get the token
+        const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+        if (!token) {
+            alert('Please log in to save changes.');
+            setIsSaving(false);
+            return;
+        }
+
         try {
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
             const res = await fetch(`${backendUrl}/content/lesson-plans/${lessonPlan.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                 // 2. Add the Authorization header
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(lessonPlan),
             });
-            if (!res.ok) throw new Error('Failed to save lesson plan');
+            if (!res.ok) {
+                if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
+                throw new Error('Failed to save lesson plan');
+            }
             alert('Lesson Plan Saved!');
-            router.refresh(); // Refresh data on the page
+            router.refresh();
         } catch (error) {
-            alert('Error saving lesson plan.');
+             alert(error instanceof Error ? error.message : 'Error saving lesson plan.');
         } finally {
             setIsSaving(false);
         }

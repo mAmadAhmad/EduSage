@@ -2,36 +2,37 @@
 
 import { useState, FormEvent } from 'react';
 
-// ... (your interfaces for Question and Quiz are the same)
-interface Question {
-  id?: number;
-  question_text: string;
-  options: string[] | null;
-  correct_answer: string;
-  question_type: string;
-}
-interface Quiz {
-  id: number;
-  title: string;
-  instructions: string | null;
-  questions: Question[];
-}
+// ... (Interfaces are the same) ...
+interface Question { id?: number; question_text: string; options: string[] | null; correct_answer: string; question_type: string; }
+interface Quiz { id: number; title: string; instructions: string | null; questions: Question[]; }
 
 
 export default function QuizEditorForm({ initialQuiz }: { initialQuiz: Quiz }) {
   const [quiz, setQuiz] = useState<Quiz>(initialQuiz);
   const [isSaving, setIsSaving] = useState(false);
 
-  // ... (All your handler functions: handleSaveChanges, handleQuizChange, etc., are correct and remain the same)
   const handleSaveChanges = async (e: FormEvent) => {
     e.preventDefault();
     if (!quiz) return;
     setIsSaving(true);
+
+    // 1. Get the token
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) {
+        alert('Please log in to save changes.');
+        setIsSaving(false);
+        return;
+    }
+
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
       const res = await fetch(`${backendUrl}/quizzes/${quiz.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        // 2. Add the Authorization header
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
             title: quiz.title,
             instructions: quiz.instructions,
@@ -39,6 +40,7 @@ export default function QuizEditorForm({ initialQuiz }: { initialQuiz: Quiz }) {
         }),
       });
       if (!res.ok) {
+        if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
         const errorData = await res.json();
         throw new Error(errorData.detail || 'Failed to save changes');
       }
