@@ -2,7 +2,6 @@
 
 import { useState, FormEvent } from 'react';
 
-// ... (Interfaces are the same) ...
 interface Question { id?: number; question_text: string; options: string[] | null; correct_answer: string; question_type: string; }
 interface Quiz { id: number; title: string; instructions: string | null; questions: Question[]; }
 
@@ -16,22 +15,13 @@ export default function QuizEditorForm({ initialQuiz }: { initialQuiz: Quiz }) {
     if (!quiz) return;
     setIsSaving(true);
 
-    // 1. Get the token
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (!token) {
-        alert('Please log in to save changes.');
-        setIsSaving(false);
-        return;
-    }
-
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       const res = await fetch(`${backendUrl}/quizzes/${quiz.id}`, {
         method: 'PUT',
-        // 2. Add the Authorization header
+        credentials: 'include',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             title: quiz.title,

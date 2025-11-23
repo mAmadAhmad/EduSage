@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation'; 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -15,15 +15,15 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
-      
-      // FastAPI's OAuth2PasswordRequestForm expects form data, not JSON
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ;
       const formData = new URLSearchParams();
       formData.append('username', username);
       formData.append('password', password);
 
+      // The backend will set the cookie automatically on success
       const res = await fetch(`${backendUrl}/auth/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData.toString(),
       });
@@ -33,13 +33,15 @@ export default function LoginPage() {
         throw new Error(errorData.detail || 'Login failed');
       }
 
-      const data = await res.json();
-
-      if (typeof window !== 'undefined') { 
-          localStorage.setItem('accessToken', data.access_token);
+      // THE FIX: We do NOT save the access_token anymore.
+      // We just set a simple flag for UI state.
+      if (typeof window !== 'undefined') {
+          localStorage.setItem('userState', 'active');
       }
-
-      router.push('./quiz-workspace'); 
+      
+      // Force a router refresh so Server Components re-run with the new cookie
+      router.refresh();
+      router.push('/quiz-workspace'); 
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');

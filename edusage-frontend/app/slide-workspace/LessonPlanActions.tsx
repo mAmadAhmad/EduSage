@@ -7,19 +7,12 @@ export default function LessonPlanActions({ lessonPlanId }: { lessonPlanId: numb
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this lesson plan?')) return;
 
-    // 1. Get the token
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (!token) {
-        alert('Please log in to delete.');
-        return;
-    }
     
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       const res = await fetch(`${backendUrl}/content/lesson-plans/${lessonPlanId}`, {
           method: 'DELETE',
-          // 2. Add the Authorization header
-          headers: { 'Authorization': `Bearer ${token}` }
+          credentials: 'include'
       });
       
       if (!res.ok) {

@@ -15,15 +15,12 @@ export default function LessonPlanPage({ params }: { params: { lessonPlanId: str
 
     useEffect(() => {
         const fetchLessonPlan = async () => {
-             const token = localStorage.getItem('accessToken');
-             if (!token) {
-                setError('Not logged in.'); setLoading(false); return;
-             }
+             
             try {
-                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
+                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
                 const res = await fetch(`${backendUrl}/content/lesson-plans/${params.lessonPlanId}`, {
                     cache: 'no-store',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    credentials: 'include'
                 });
                 if (!res.ok) {
                     if (res.status === 401) throw new Error('Unauthorized');

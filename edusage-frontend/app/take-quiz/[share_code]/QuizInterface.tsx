@@ -37,14 +37,6 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
     if (!confirm('Are you sure you want to submit your quiz?')) return;
     setIsSubmitting(true);
 
-    // 1. Get the token (Student needs to be logged in to submit)
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (!token) {
-        alert('Please log in to submit your quiz.');
-        setIsSubmitting(false);
-        router.push('/login'); // Redirect to login if not logged in
-        return;
-    }
     
     const formattedAnswers = Object.entries(answers).map(([questionId, answerText]) => ({
       question_id: parseInt(questionId), answer_text: answerText,
@@ -54,14 +46,13 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
     };
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       const shareCode = window.location.pathname.split('/').pop();
       const res = await fetch(`${backendUrl}/take-quiz/${shareCode}/submit`, {
         method: 'POST',
-        // 2. Add the Authorization header
+        credentials: 'include',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify(submissionPayload),
       });

@@ -9,13 +9,6 @@ export default function CreateQuizButton() {
 
   const handleCreateQuiz = async () => {
     setIsLoading(true);
-    // 1. Get the token
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (!token) {
-        alert('Please log in to create a quiz.');
-        setIsLoading(false);
-        return;
-    }
 
     try {
       const blankQuiz = {
@@ -29,13 +22,12 @@ export default function CreateQuizButton() {
         ]
       };
       
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       const res = await fetch(`${backendUrl}/quizzes/`, {
         method: 'POST',
-        // 2. Add the Authorization header
+        credentials: 'include',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify(blankQuiz),
       });

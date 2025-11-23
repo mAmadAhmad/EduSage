@@ -1,8 +1,7 @@
-# app/services/auth_service.py
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -10,12 +9,12 @@ from app.core.config import settings
 from app.api import schemas
 from app.crud import user_crud
 from app.db.dependencies import get_db
-# UPDATED: Import the verification function from our new security service
 from .security import verify_password
 
-# The password hashing code has been REMOVED from this file.
+# Define the standard cookie name
+COOKIE_NAME = "edusage_auth_token"
 
-# --- JWT Token Creation ---
+# OAuth2PasswordBearer is needed for Swagger UI to work, but we primarily rely on cookies
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
@@ -30,23 +29,31 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-# --- Get Current User Dependency ---
-def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)) -> schemas.User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+# --- THE CORE SECURITY DEPENDENCY ---
+def get_current_user(request: Request, db: Session = Depends(get_db)) -> schemas.User:
+    """
+    Retrieves the JWT from the HTTP-only cookie and validates the user.
+    This is the single source of truth for authentication.
+    """
+    token = request.cookies.get(COOKIE_NAME)
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
-            raise credentials_exception
+            raise HTTPException(status_code=401, detail="Invalid token")
         token_data = schemas.TokenData(username=username)
     except JWTError:
-        raise credentials_exception
+        raise HTTPException(status_code=401, detail="Invalid token")
 
     user = user_crud.get_user_by_username(db, username=token_data.username)
     if user is None:
-        raise credentials_exception
+        raise HTTPException(status_code=401, detail="User not found")
     return user

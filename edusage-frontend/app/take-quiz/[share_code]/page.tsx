@@ -11,9 +11,10 @@ interface PublicQuiz {
 
 async function getQuizByShareCode(share_code: string): Promise<PublicQuiz | null> {
   try {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     const res = await fetch(`${backendUrl}/take-quiz/${share_code}`, {
       cache: 'no-store',
+      credentials: 'include'
     });
     if (!res.ok) {
       const errorData = await res.json();

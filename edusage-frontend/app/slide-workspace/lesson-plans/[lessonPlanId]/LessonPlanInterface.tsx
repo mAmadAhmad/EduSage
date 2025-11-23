@@ -27,22 +27,13 @@ export default function LessonPlanInterface({ initialLessonPlan }: { initialLess
         e.preventDefault();
         setIsSaving(true);
 
-        // 1. Get the token
-        const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-        if (!token) {
-            alert('Please log in to save changes.');
-            setIsSaving(false);
-            return;
-        }
-
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000/api/v1';
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
             const res = await fetch(`${backendUrl}/content/lesson-plans/${lessonPlan.id}`, {
                 method: 'PUT',
-                 // 2. Add the Authorization header
+                credentials: 'include',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(lessonPlan),
             });

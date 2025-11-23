@@ -33,8 +33,7 @@ app = FastAPI(
 # Add this block to allow CORS requests from your Next.js frontend
 origins = [
     "http://localhost:3000",
-    "http://10.8.24.199:3000",
-    "http://localhost:8000" # Add this line to allow your local host to access the server
+    "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
