@@ -45,7 +45,8 @@ def grade_submission_with_ai(submission_id: int, request: schemas.AIGradingReque
 
     ai_response_dict = grading_chain.invoke({
         "grading_criteria": request.grading_criteria,
-        "submission_context": submission_context
+        "submission_context": submission_context,
+        "reference_context": "No specific document context provided. Grade based on the Correct Answer given."
     })
 
     ai_response = schemas.AIGradingResponse(**ai_response_dict)

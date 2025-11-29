@@ -144,33 +144,44 @@ def get_grading_chain():
         print("Initializing AI Grading chain...")
         # UPDATED, MORE ROBUST PROMPT
         grading_prompt_template = """
-        You are an expert AI teaching assistant...
-        Your task is to grade the provided submission based on the correct answers and the teacher's grading criteria.
-        For each question, provide an integer score and brief feedback.
-
-        GRADING CRITERIA:
-        ---
-        {grading_criteria}
-        ---
-
-        QUIZ SUBMISSION:
-        ---
-        {submission_context}
-        ---
-
-        Provide your response as a single, valid JSON object only. Do not include any other text or markdown formatting.
-        The JSON object must follow this exact structure, including all fields:
-        {{
-            "overall_feedback": "A brief summary of the student's performance.",
-            "graded_answers": [
-                {{
-                    "question_id": <the integer ID of the question>,
-                    "score": <an integer score for this answer>,
-                    "feedback": "Your specific feedback for this answer."
-                }}
-            ]
-        }}
-        """
+            You are an expert AI teaching assistant. Grade the student's submission.
+    
+            INPUTS:
+            1. Reference Context (Truth source):
+            ---
+            {reference_context}
+            ---
+    
+            2. Grading Criteria:
+            ---
+            {grading_criteria}
+            ---
+    
+            3. Student Submission:
+            ---
+            {submission_context}
+            ---
+    
+            INSTRUCTIONS:
+            - Compare the Student's Answer to the Correct Answer AND the Reference Context.
+            - If the Reference Context is provided, use it to verify facts.
+            - If the Reference Context is missing/empty, use your general knowledge.
+            - Provide a score (0-10) and helpful feedback.
+            - CRITICAL: You must return a JSON object with a "graded_answers" list.
+            - CRITICAL: Each item in the list MUST include the exact "question_id" from the input.
+    
+            JSON STRUCTURE:
+            {{
+                "overall_feedback": "Summary...",
+                "graded_answers": [
+                    {{
+                        "question_id": <int>, 
+                        "score": <int>,
+                        "feedback": "Specific feedback..."
+                    }}
+                ]
+            }}
+            """
         prompt = ChatPromptTemplate.from_template(grading_prompt_template)
         grading_chain = prompt | llm | JsonOutputParser()
         print("AI Grading chain initialized.")

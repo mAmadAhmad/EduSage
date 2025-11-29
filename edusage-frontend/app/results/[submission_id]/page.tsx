@@ -14,9 +14,6 @@ export default function ResultsPage({ params }: { params: { submission_id: strin
 
     useEffect(() => {
         const fetchReport = async () => {
-            // NOTE: This endpoint might become protected later depending on your access rules
-            const token = localStorage.getItem('accessToken'); // Assuming student needs to be logged in
-            // if (!token) { setError('Not logged in.'); setLoading(false); return; }
 
             try {
                 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;

@@ -1,6 +1,7 @@
 # app/api/schemas.py
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 
 # --- QUESTION SCHEMAS ---
 class QuestionBase(BaseModel):
@@ -238,3 +239,22 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+
+# --- Quick Study Schemas ---
+class QuickStudyCreate(BaseModel):
+    source_document: str
+    num_mcq: int
+    num_short_answer: int
+
+class QuickStudySubmit(BaseModel):
+    answers: Dict[int, str]
+
+class QuickStudyResponse(BaseModel):
+    id: int
+    source_document: str
+    quiz_data: List[Dict[str, Any]]
+    report_data: Optional[List[Dict[str, Any]]] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
