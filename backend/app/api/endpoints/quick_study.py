@@ -18,15 +18,21 @@ async def start_quick_study(
         db: Session = Depends(get_db),
         current_user: schemas.User = Depends(get_current_user)
 ):
-    # 1. Reuse existing RAG logic to fetch context
-    filters = wvc.query.Filter.by_property("source").equal(request.source_document)
-    collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
-    response = collection.query.fetch_objects(limit=40, filters=filters)
+    context = ""
+    if request.text_content:
+        context = request.text_content
+    elif request.source_document:
+        # 1. Reuse existing RAG logic to fetch context
+        filters = wvc.query.Filter.by_property("source").equal(request.source_document)
+        collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
+        response = collection.query.fetch_objects(limit=40, filters=filters)
 
-    if not response.objects:
-        raise HTTPException(status_code=404, detail="Document not found")
+        if not response.objects:
+            raise HTTPException(status_code=404, detail="Document not found")
 
-    context = "\n\n".join([obj.properties['content'] for obj in response.objects])
+        context = "\n\n".join([obj.properties['content'] for obj in response.objects])
+    else:
+        raise HTTPException(status_code=400, detail="No input provided.")
 
     # 2. Generate Quiz JSON
     quiz_chain = vector_service.get_quiz_chain()
@@ -46,7 +52,7 @@ async def start_quick_study(
 
     db_session = quick_study_model.QuickStudySession(
         user_id=current_user.id,
-        source_document=request.source_document,
+        source_document=request.source_document or "Raw Text Input",
         quiz_data=questions_with_ids
     )
     db.add(db_session)

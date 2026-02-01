@@ -3,26 +3,61 @@
 import { useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
+import ContextSelector from '../components/ContextSelector';
 
 export default function AILessonPlanGenerator() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceDoc, setSourceDoc] = useState('Geography_USA.pdf');
+  
+  // State for Context
+  const [sourceDoc, setSourceDoc] = useState('');
+  const [rawText, setRawText] = useState('');
+  const [inputType, setInputType] = useState<'file' | 'text'>('file');
+  
   const router = useRouter();
+
+  // Callback for ContextSelector
+  const handleContextSelection = (value: string, type: 'file' | 'text') => {
+      setInputType(type);
+      if (type === 'file') {
+          setSourceDoc(value);
+          setRawText('');
+      } else {
+          setRawText(value);
+          setSourceDoc('');
+      }
+  };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (inputType === 'file' && !sourceDoc) {
+        alert("Please select a document from the list.");
+        return;
+    }
+    if (inputType === 'text' && !rawText) {
+        alert("Please paste and confirm your text.");
+        return;
+    }
+    
     setIsLoading(true);
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/api/v1';
+      
+      const payload = {
+        source_document: inputType === 'file' ? sourceDoc : null,
+        text_content: inputType === 'text' ? rawText : null,
+        instructions: "Create a standard 45-minute lesson plan." // Default or add a field for this
+      };
+
       const res = await fetch(`${backendUrl}/content/generate-lesson`, {
         method: 'POST',
         credentials: 'include',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ source_document: sourceDoc }), // Add other params as needed
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -33,7 +68,7 @@ export default function AILessonPlanGenerator() {
       const newLessonPlan = await res.json();
       setIsOpen(false);
       router.push(`/slide-workspace/lesson-plans/${newLessonPlan.id}`);
-      router.refresh(); // Refresh dashboard
+      router.refresh();
 
     } catch (error) {
        alert(error instanceof Error ? error.message : 'An unknown error occurred.');
@@ -41,6 +76,7 @@ export default function AILessonPlanGenerator() {
       setIsLoading(false);
     }
   };
+
   return (
     <>
       <button onClick={() => setIsOpen(true)} className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">
@@ -49,7 +85,10 @@ export default function AILessonPlanGenerator() {
 
       <Transition appear show={isOpen} as={Fragment}>
         <Dialog as="div" className="relative z-10" onClose={() => setIsOpen(false)}>
-          {/* ... (Modal styling is the same as AIQuizGenerator) ... */}
+          <Transition.Child as={Fragment} enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0">
+             <div className="fixed inset-0 bg-black/30" />
+          </Transition.Child>
+          
           <div className="fixed inset-0 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4 text-center">
               <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
@@ -57,11 +96,15 @@ export default function AILessonPlanGenerator() {
                   Generate Lesson Plan with AI
                 </Dialog.Title>
                 <form onSubmit={handleGenerate} className="mt-4 space-y-4">
+                  
+                  {/* Context Selector */}
                   <div>
-                    <label htmlFor="sourceDoc" className="block text-sm font-medium text-gray-700">Source Document</label>
-                    <input type="text" id="sourceDoc" value={sourceDoc} onChange={(e) => setSourceDoc(e.target.value)}
-                           className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm"/>
+                    <ContextSelector 
+                        currentSelection={inputType === 'file' ? sourceDoc : rawText} 
+                        onSelectionChange={handleContextSelection} 
+                    />
                   </div>
+                  
                   <div className="mt-6 flex justify-end gap-4">
                     <button type="button" onClick={() => setIsOpen(false)} className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
                     <button type="submit" disabled={isLoading} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400">

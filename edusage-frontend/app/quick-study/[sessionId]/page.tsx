@@ -22,7 +22,7 @@ export default function QuickStudyPage({ params: { sessionId } }: { params: { se
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/api/v1';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     
     // Ensure keys are numbers for the backend schema
     const formattedAnswers: Record<number, string> = {};

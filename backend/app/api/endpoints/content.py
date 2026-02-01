@@ -20,30 +20,40 @@ async def generate_lesson_plan(request: schemas.LessonPlanRequest,
     if not chain:
         raise HTTPException(status_code=503, detail="Lesson Plan chain is not initialized.")
     try:
-        print(f"Generating lesson plan for document: {request.source_document}")
+        context = ""
+        if request.text_content:
+            print("")
+            context = request.text_content
 
-        filters = wvc.query.Filter.by_property("source").equal(request.source_document)
+        elif request.source_document:
+            print(f"Generating lesson plan for document: {request.source_document}")
 
-        if request.page_start is not None and request.page_end is not None:
-            page_filter = wvc.query.Filter.by_property("page").greater_or_equal(
-                request.page_start
-            ) & wvc.query.Filter.by_property("page").less_or_equal(
-                request.page_end
+            filters = wvc.query.Filter.by_property("source").equal(request.source_document)
+
+            if request.page_start is not None and request.page_end is not None:
+                page_filter = wvc.query.Filter.by_property("page").greater_or_equal(
+                    request.page_start
+                ) & wvc.query.Filter.by_property("page").less_or_equal(
+                    request.page_end
+                )
+                filters = filters & page_filter
+
+            collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
+
+            response = collection.query.fetch_objects(
+                limit=50,
+                filters=filters
             )
-            filters = filters & page_filter
 
-        collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
+            if not response.objects:
+                raise HTTPException(status_code=404,
+                                    detail=f"Document {request.source_document} not found or has no content.")
 
-        response = collection.query.fetch_objects(
-            limit=50,
-            filters=filters
-        )
+            context = "\n\n--\n\n".join([obj.properties['content'] for obj in response.objects])
 
-        if not response.objects:
-            raise HTTPException(status_code=404,
-                                detail=f"Document {request.source_document} not found or has no content.")
+        else:
+            raise HTTPException(status_code=400, detail="No input provided.")
 
-        context = "\n\n--\n\n".join([obj.properties['content'] for obj in response.objects])
         lesson_plan_data = await chain.ainvoke({"instructions": request.instructions, "context": context})
         lesson_plan_to_create = schemas.LessonPlanCreate(**lesson_plan_data)
 

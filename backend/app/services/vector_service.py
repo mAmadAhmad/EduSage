@@ -1,21 +1,24 @@
 # app/services/vector_service.py
-# from langchain.chains.summarize.refine_prompts import prompt_template
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq  # CHANGED: Import Groq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 import weaviate
 from weaviate.classes.config import Property, DataType, Configure
 from langchain_weaviate import WeaviateVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.core.config import settings
 
-# Global variables for the service components
+# Global variables
 weaviate_client = None
 embedding_model = None
 text_splitter = None
 vector_store = None
-llm = None  # We'll initialize the LLM once and share it.
+
+# We now have TWO models
+llm_fast = None  # Llama 3.1 8b (Grading, Simple Tasks)
+llm_complex = None  # Llama 3.3 70b (Generation, RAG)
+
 rag_chain = None
 quiz_generation_chain = None
 grading_chain = None
@@ -23,24 +26,23 @@ lesson_plan_chain = None
 
 
 def init_vector_service():
-    """Initializes the base components that are always needed."""
-    global weaviate_client, embedding_model, text_splitter, vector_store, llm
+    """Initializes the base components."""
+    global weaviate_client, embedding_model, text_splitter, vector_store, llm_fast, llm_complex
     print("Initializing base vector service components...")
 
-    # Load embedding model
+    # 1. Embedding Model (Unchanged - HuggingFace)
     embedding_model = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
 
-    # Configure text splitter
+    # 2. Text Splitter (Unchanged)
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=settings.TEXT_CHUNK_SIZE,
         chunk_overlap=settings.TEXT_CHUNK_OVERLAP
     )
 
-    # Connect to Weaviate and initialize vector store
+    # 3. Weaviate Connection (Unchanged)
     weaviate_client = weaviate.connect_to_local()
     print("Successfully connected to Weaviate.")
 
-    # Ensure the collection exists
     if not weaviate_client.collections.exists(settings.WEAVIATE_COLLECTION):
         weaviate_client.collections.create(
             name=settings.WEAVIATE_COLLECTION,
@@ -61,10 +63,22 @@ def init_vector_service():
     )
     print("Vector Service Initialized.")
 
-    # Initialize llm once to be shared by all chains
-    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite-001", google_api_key=settings.GOOGLE_API_KEY)
+    # 4. Initialize Groq Models (Plug and Play)
+    # Fast Model: Llama 3.1 8B Instant (Great for speed/grading)
+    llm_fast = ChatGroq(
+        temperature=0,
+        model_name="llama-3.1-8b-instant",
+        api_key=settings.GROQ_API_KEY
+    )
 
-    print("Base components initialized.")
+    # Complex Model: Llama 3.3 70B Versatile (Great for generation/reasoning)
+    llm_complex = ChatGroq(
+        temperature=0,
+        model_name="llama-3.3-70b-versatile",
+        api_key=settings.GROQ_API_KEY
+    )
+
+    print("Groq Models Initialized: Fast (8b) & Complex (70b)")
 
 
 def close_vector_service():
@@ -76,27 +90,30 @@ def close_vector_service():
 
 
 def get_rag_chain():
-    """Returns the singleton RAG chain, initializing it if necessary."""
+    """RAG Chain - Uses Complex Model for better context synthesis."""
     global rag_chain
     if rag_chain is None:
-        print("Initializing RAG chain for the first time...")
+        print("Initializing RAG chain...")
         prompt_template_str = """
-                You are an expert educational assistant. Based ONLY on the following context, provide a clear and concise answer to the question. If the information is not in the context, say that you cannot find the answer in the provided documents.
-                Context: {context}
-                Question: {question}
-                Answer:
-                """
+        You are an expert educational assistant. Based ONLY on the following context, provide a clear and concise answer to the question. 
+        If the information is not in the context, say that you cannot find the answer in the provided documents.
+
+        Context: {context}
+        Question: {question}
+        Answer:
+        """
         prompt = ChatPromptTemplate.from_template(prompt_template_str)
-        rag_chain = prompt | llm | StrOutputParser()
+        # Using 70b for better reasoning on context
+        rag_chain = prompt | llm_complex | StrOutputParser()
         print("RAG chain initialized.")
     return rag_chain
 
 
 def get_quiz_chain():
+    """Quiz Generation - Uses Complex Model for instruction following."""
     global quiz_generation_chain
     if quiz_generation_chain is None:
-        print("Initializing Quiz Generation chain for the first time...")
-        # UPDATED, MORE ROBUST PROMPT
+        print("Initializing Quiz Generation chain...")
         quiz_prompt_template = """
         You are an expert educator and quiz creator. Your task is to generate a quiz based ONLY on the provided context.
         Do not use any external knowledge.
@@ -133,35 +150,36 @@ def get_quiz_chain():
             ---
         """
         prompt = ChatPromptTemplate.from_template(quiz_prompt_template)
-        quiz_generation_chain = prompt | llm | JsonOutputParser()
+        # Using 70b because it handles complex JSON formatting constraints much better
+        quiz_generation_chain = prompt | llm_complex | JsonOutputParser()
         print("Quiz Generation Chain initialized.")
     return quiz_generation_chain
 
 
 def get_grading_chain():
+    """Grading - Uses Fast Model (8b) for speed and efficiency."""
     global grading_chain
     if grading_chain is None:
         print("Initializing AI Grading chain...")
-        # UPDATED, MORE ROBUST PROMPT
         grading_prompt_template = """
             You are an expert AI teaching assistant. Grade the student's submission.
-    
+
             INPUTS:
             1. Reference Context (Truth source):
             ---
             {reference_context}
             ---
-    
+
             2. Grading Criteria:
             ---
             {grading_criteria}
             ---
-    
+
             3. Student Submission:
             ---
             {submission_context}
             ---
-    
+
             INSTRUCTIONS:
             - Compare the Student's Answer to the Correct Answer AND the Reference Context.
             - If the Reference Context is provided, use it to verify facts.
@@ -169,7 +187,7 @@ def get_grading_chain():
             - Provide a score (0-10) and helpful feedback.
             - CRITICAL: You must return a JSON object with a "graded_answers" list.
             - CRITICAL: Each item in the list MUST include the exact "question_id" from the input.
-    
+
             JSON STRUCTURE:
             {{
                 "overall_feedback": "Summary...",
@@ -183,12 +201,14 @@ def get_grading_chain():
             }}
             """
         prompt = ChatPromptTemplate.from_template(grading_prompt_template)
-        grading_chain = prompt | llm | JsonOutputParser()
+        # Using 8b here as requested - it is fast and good at evaluating text against a reference
+        grading_chain = prompt | llm_fast | JsonOutputParser()
         print("AI Grading chain initialized.")
     return grading_chain
 
 
 def get_lesson_plan_chain():
+    """Lesson Plan - Uses Complex Model for structured creativity."""
     global lesson_plan_chain
     if lesson_plan_chain is None:
         print("Initializing Lesson Plan chain...")
@@ -226,7 +246,7 @@ def get_lesson_plan_chain():
                 }}
                 """
         prompt = ChatPromptTemplate.from_template(lesson_plan_prompt_template)
-        lesson_plan_chain = prompt | llm | JsonOutputParser()
+        # Using 70b for high-quality structure generation
+        lesson_plan_chain = prompt | llm_complex | JsonOutputParser()
         print("Lesson Plan chain initialized.")
     return lesson_plan_chain
-

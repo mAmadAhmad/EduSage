@@ -29,7 +29,7 @@ export default function Navbar() {
   }, []);
 
   const handleLogout = async () => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/api/v1';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     try {
         await fetch(`${backendUrl}/auth/logout`, { method: 'POST' });
     } catch (e) {

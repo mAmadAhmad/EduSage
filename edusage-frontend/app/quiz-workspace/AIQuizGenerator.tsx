@@ -3,29 +3,53 @@
 import { useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
+import ContextSelector from '../components/ContextSelector'; 
 
 export default function AIQuizGenerator() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceDoc, setSourceDoc] = useState('Geography_USA.pdf');
+  const [sourceDoc, setSourceDoc] = useState('');
+  const [rawText, setRawText] = useState('');
   const [numMcq, setNumMcq] = useState<number | ''>(3);
   const [numShortAnswer, setNumShortAnswer] = useState<number | ''>(2);
   const [pageStart, setPageStart] = useState<number | ''>('');
   const [pageEnd, setPageEnd] = useState<number | ''>('');
   const [customInstructions, setCustomInstructions] = useState('');
   const [difficulty, setDifficulty] = useState('Normal');
+  const [inputType, setInputType] = useState<'file' | 'text'>('file');
   
   const router = useRouter();
 
+  // Callback for ContextSelector
+  const handleContextSelection = (value: string, type: 'file' | 'text') => {
+      setInputType(type);
+      if (type === 'file') {
+          setSourceDoc(value);
+          setRawText('');
+      } else {
+          setRawText(value);
+          setSourceDoc('');
+      }
+  };
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (inputType === 'file' && !sourceDoc) {
+        alert("Please select a document from the list.");
+        return;
+    }
+    if (inputType === 'text' && !rawText) {
+        alert("Please paste and confirm your text.");
+        return;
+    }
     setIsLoading(true);
 
     
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       const payload = {
-        source_document: sourceDoc,
+        source_document: inputType === 'file' ? sourceDoc : null,
+        text_content: inputType === 'text' ? rawText : null,  
         num_mcq: numMcq || 0,
         num_short_answer: numShortAnswer || 0,
         difficulty: difficulty,
@@ -90,9 +114,10 @@ export default function AIQuizGenerator() {
                   
                   {/* --- ALL FORM FIELDS RESTORED --- */}
                   <div>
-                    <label htmlFor="sourceDoc" className="block text-sm font-medium text-gray-700">Source Document</label>
-                    <input type="text" id="sourceDoc" value={sourceDoc} onChange={(e) => setSourceDoc(e.target.value)}
-                           className="mt-1 block w-full rounded-md border-gray-300 text-gray-900 shadow-sm sm:text-sm px-2"/>
+                    <ContextSelector 
+                    currentSelection={inputType === 'file' ? sourceDoc : rawText} 
+                    onSelectionChange={handleContextSelection} 
+      />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

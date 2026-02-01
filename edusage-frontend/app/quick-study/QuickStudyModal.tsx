@@ -4,27 +4,54 @@ import { useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
 import { BookOpen } from 'lucide-react';
+import ContextSelector from '../components/ContextSelector';
 
 export default function QuickStudyModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Default State
-  const [sourceDoc, setSourceDoc] = useState('Geography_USA.pdf');
+  // State for Context Selection
+  const [sourceDoc, setSourceDoc] = useState('');
+  const [rawText, setRawText] = useState('');
+  const [inputType, setInputType] = useState<'file' | 'text'>('file');
+
   const [numMcq, setNumMcq] = useState<number>(5);
   const [numShort, setNumShort] = useState<number>(0);
   const router = useRouter();
 
+  // Handle switching between File and Text input
+  const handleContextSelection = (value: string, type: 'file' | 'text') => {
+      setInputType(type);
+      if (type === 'file') {
+          setSourceDoc(value);
+          setRawText('');
+      } else {
+          setRawText(value);
+          setSourceDoc('');
+      }
+  };
+
   const handleStart = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (inputType === 'file' && !sourceDoc) {
+        alert("Please select a document from the list.");
+        return;
+    }
+    if (inputType === 'text' && !rawText) {
+        alert("Please paste and confirm your text.");
+        return;
+    }
+
     setIsLoading(true);
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/api/v1';
       
-      // We send ONE request to our new efficient endpoint
+      // Dynamic Payload based on input type
       const payload = {
-        source_document: sourceDoc,
+        source_document: inputType === 'file' ? sourceDoc : null,
+        text_content: inputType === 'text' ? rawText : null,
         num_mcq: numMcq,
         num_short_answer: numShort
       };
@@ -33,7 +60,7 @@ export default function QuickStudyModal() {
       const res = await fetch(`${backendUrl}/quick-study/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // Important for cookies
+        credentials: 'include',
         body: JSON.stringify(payload),
       });
 
@@ -41,7 +68,6 @@ export default function QuickStudyModal() {
       
       const session = await res.json();
 
-      // Redirect directly to the new streamlined page
       setIsOpen(false);
       router.push(`/quick-study/${session.id}`);
 
@@ -82,14 +108,11 @@ export default function QuickStudyModal() {
                 </Dialog.Title>
                 <form onSubmit={handleStart} className="mt-4 space-y-4">
                   
-                  {/* Source Document */}
+                  {/* Context Selector */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Document Name</label>
-                    <input 
-                      type="text" 
-                      value={sourceDoc} 
-                      onChange={(e) => setSourceDoc(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm px-3 py-2 border text-gray-900"
+                    <ContextSelector 
+                        currentSelection={inputType === 'file' ? sourceDoc : rawText} 
+                        onSelectionChange={handleContextSelection} 
                     />
                   </div>
 

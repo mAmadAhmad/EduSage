@@ -6,6 +6,7 @@ import weaviate.classes as wvc
 from app.services import vector_service
 from app.core.config import settings
 from app.api import schemas
+from typing import List
 
 router = APIRouter()
 
@@ -192,30 +193,40 @@ async def generate_quiz(request: schemas.QuizGenerationRequest):
         raise HTTPException(status_code=503, detail="Quiz generation chain is not initialized.")
 
     try:
-        print(f"Generating quiz for document: {request.source_document}")
+        context = ""
 
-        filters = wvc.query.Filter.by_property("source").equal(request.source_document)
+        if request.text_content:
+            print("Using raw text content for generation.")
+            context = request.text_content
 
-        if request.page_start is not None and request.page_end is not None:
-            page_filter = wvc.query.Filter.by_property("page").greater_or_equal(
-                request.page_start
-            ) & wvc.query.Filter.by_property("page").less_or_equal(
-                request.page_end
+        elif request.source_document:
+            print(f"Generating quiz for document: {request.source_document}")
+
+            filters = wvc.query.Filter.by_property("source").equal(request.source_document)
+
+            if request.page_start is not None and request.page_end is not None:
+                page_filter = wvc.query.Filter.by_property("page").greater_or_equal(
+                    request.page_start
+                ) & wvc.query.Filter.by_property("page").less_or_equal(
+                    request.page_end
+                )
+
+                filters = filters & page_filter
+
+            collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
+
+            response = collection.query.fetch_objects(
+                limit=50,
+                filters=filters
             )
 
-            filters = filters & page_filter
+            if not response.objects:
+                raise HTTPException(status_code=404, detail=f"Document '{request.source_document}' not found or has no content.")
 
-        collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
+            context = "\n\n--\n\n".join([obj.properties['content'] for obj in response.objects])
 
-        response = collection.query.fetch_objects(
-            limit=50,
-            filters=filters
-        )
-
-        if not response.objects:
-            raise HTTPException(status_code=404, detail=f"Document '{request.source_document}' not found or has no content.")
-
-        context = "\n\n--\n\n".join([obj.properties['content'] for obj in response.objects])
+        else:
+            raise HTTPException(status_code=400, detail="Either source_document or text_content must be provided.")
 
         # 2. invoke the chain with all required inputs
         quiz_json = await vector_service.quiz_generation_chain.ainvoke({
@@ -255,5 +266,29 @@ async def wipe_collection_data():
 
 # --- End: Database Wipe Endpoint ---
 
+# --- NEW: List Documents Endpoint ---
+@router.get("/list", response_model=List[str], summary="List all available documents")
+def list_documents():
+    if not vector_service.weaviate_client:
+        raise HTTPException(status_code=503, detail="Weaviate client not available.")
 
+    try:
+        collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
 
+        # Fetching just the 'source' property for up to 1000 chunks
+        response = collection.query.fetch_objects(
+            limit=1000,
+            return_properties=["source"]
+        )
+
+        sources = set()
+        for obj in response.objects:
+            src = obj.properties.get("source")
+            # Filter out temporary text files so they don't clutter the UI
+            if src and not src.startswith("temp_text_"):
+                sources.add(src)
+
+        return list(sources)
+    except Exception as e:
+        print(f"Error listing docs: {e}")
+        return []

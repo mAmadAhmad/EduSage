@@ -37,7 +37,8 @@ class Quiz(QuizBase):
 
 # --- AI GENERATION SCHEMAS ---
 class QuizGenerationRequest(BaseModel):
-    source_document: str # The filename
+    source_document: Optional[str] = None
+    text_content: Optional[str] = None
     difficulty: str = "Normal"
     num_mcq: int = 3
     num_short_answer: int = 2
@@ -176,7 +177,8 @@ class Slide(BaseModel):
     speaker_notes: str
 
 class LessonPlanRequest(BaseModel):
-    source_document: str
+    source_document: Optional[str] = None
+    text_content: Optional[str] = None
     instructions: str="Create a standard 45-minute lesson plan."
     page_start: Optional[int] = None
     page_end: Optional[int] = None
@@ -198,7 +200,6 @@ class LessonPlanBase(BaseModel):
 class LessonPlanCreate(LessonPlanBase):
     pass
 
-# This is what the API will now return
 class LessonPlan(LessonPlanBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
@@ -243,7 +244,8 @@ class TokenData(BaseModel):
 
 # --- Quick Study Schemas ---
 class QuickStudyCreate(BaseModel):
-    source_document: str
+    source_document: Optional[str] = None
+    text_content: Optional[str] = None
     num_mcq: int
     num_short_answer: int
 
