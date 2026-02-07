@@ -182,9 +182,10 @@ def get_grading_chain():
 
             INSTRUCTIONS:
             - Compare the Student's Answer to the Correct Answer AND the Reference Context.
+            - Short Answer don't have to be an exact match to Correct Answer, check for Student's logic and find if it is correct given the Correct Answer AND the Reference Context.
             - If the Reference Context is provided, use it to verify facts.
             - If the Reference Context is missing/empty, use your general knowledge.
-            - Provide a score (0-10) and helpful feedback.
+            - Provide a score (0-10) or if user specifies other criteria follow that, and helpful feedback.
             - CRITICAL: You must return a JSON object with a "graded_answers" list.
             - CRITICAL: Each item in the list MUST include the exact "question_id" from the input.
 

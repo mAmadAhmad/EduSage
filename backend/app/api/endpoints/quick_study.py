@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
+import asyncio
+import weaviate.classes as wvc
 from sqlalchemy.orm import Session
 from app.api import schemas
 from app.db.dependencies import get_db
 from app.services.auth_service import get_current_user
-from app.services import vector_service
+from app.services import vector_service, grading_service
 from app.models import quick_study_model
 from app.core.config import settings
-import weaviate.classes as wvc
-from typing import List, Dict, Any
 
 router = APIRouter()
 
@@ -78,38 +78,66 @@ async def submit_quick_study(
     if not db_session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # --- NEW: Re-fetch Context for Grading ---
-    # We use the stored filename to get the same context used for generation
+    # 2. Re-fetch Context (Only needed for Subjective questions)
     filters = wvc.query.Filter.by_property("source").equal(db_session.source_document)
     collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
     response = collection.query.fetch_objects(limit=40, filters=filters)
 
-    # If file was deleted, we fallback to empty context (LLM uses general knowledge)
     reference_context = ""
     if response.objects:
         reference_context = "\n\n".join([obj.properties['content'] for obj in response.objects])
-    # -----------------------------------------
 
-    # 2. Prepare Submission Context
-    submission_text = ""
-    for q in db_session.quiz_data:
-        qid = q['id']
-        # Convert key to int to ensure matching
-        user_ans = submission.answers.get(qid, "No Answer")
-        # Explicitly label the ID so the LLM sees it
-        submission_text += f"ID: {qid}\nQuestion: {q['question_text']}\nCorrect Answer: {q['correct_answer']}\nStudent Answer: {user_ans}\n---\n"
+    # 3. Grading Logic Loop
+    graded_results = []
 
-    # 3. Call AI with Context
-    grading_chain = vector_service.get_grading_chain()
+    # collecting subjective tasks to run them in batch
+    subjective_tasks = []
+    subjective_indices = [] # keep track of order
+    for i, q in enumerate(db_session.quiz_data):
+       qid = q['id']
+       q_type = q.get('question_type', 'Short Answer')
+       usr_ans = submission.answers.get(str(qid)) or submission.answers.get(qid) or "No Answer"
 
-    ai_response = await grading_chain.ainvoke({
-        "grading_criteria": "Be strict but helpful. Point out exactly why an answer is wrong.",
-        "submission_context": submission_text,
-        "reference_context": reference_context or "No reference text provided. Use general knowledge."
-    })
+       # --- PATH A: MCQ (Instant Local Check) ---
+       if q_type == "MCQ":
+           correct_ans = q['correct_answer']
+           is_correct = usr_ans.strip() == correct_ans.strip()
+           result = {
+               "question_id": qid,
+               "score": 10 if is_correct else 0,
+               "feedback": "Correct!" if is_correct else f"Incorrect!, The correct answer is {correct_ans}",
+               "breakdown": None
+           }
+           graded_results.append(result)
+       # --- PATH B: SUBJECTIVE (Hybrid AI Check) ---
+       else:
+           task = grading_service.calculate_hybrid_grade(
+               question_text=q['question_text'],
+               correct_answer=q['correct_answer'],
+               student_answer=usr_ans,
+               reference_context=reference_context
+           )
+           subjective_tasks.append(task)
+           subjective_indices.append(qid)
 
-    # 4. Save Report
-    db_session.report_data = ai_response['graded_answers']
+    # 4. Execute Subjective Grading in Parallel (Fast!)
+    if subjective_tasks:
+        ai_grades = await asyncio.gather(*subjective_tasks)
+
+        # Merge back into results
+        for qid, grade in zip(subjective_indices, ai_grades):
+            result={
+                "question_id": qid,
+                "score": grade['final_score'],
+                "feedback": grade['feedback'],
+                "breakdown": grade['breakdown'],
+                "keywords": grade['keywords']
+            }
+            graded_results.append(result)
+
+    # 5. Save Report
+    graded_results.sort(key=lambda x: x['question_id'])
+    db_session.report_data = graded_results
 
     from sqlalchemy.orm.attributes import flag_modified
     flag_modified(db_session, "report_data")

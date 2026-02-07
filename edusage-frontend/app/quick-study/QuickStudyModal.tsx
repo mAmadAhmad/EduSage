@@ -46,7 +46,7 @@ export default function QuickStudyModal() {
     setIsLoading(true);
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/api/v1';
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       
       // Dynamic Payload based on input type
       const payload = {
