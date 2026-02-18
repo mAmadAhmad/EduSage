@@ -1,10 +1,7 @@
-'use client'; // Make it a Client Component
+'use client'; 
 
 import { useState, useEffect } from 'react';
-import GradingInterface from './GradingInterface';
-
-// Keep the interface
-interface SubmissionDetails { submission_id: number; student_name: string; quiz_id: number; quiz_title: string; questions: any[]; }
+import GradingInterface, { SubmissionDetails } from './GradingInterface';
 
 export default function GradingPage({ params }: { params: { submission_id: string } }) {
     const [details, setDetails] = useState<SubmissionDetails | null>(null);
@@ -33,12 +30,26 @@ export default function GradingPage({ params }: { params: { submission_id: strin
         fetchDetails();
     }, [params.submission_id]);
 
-    if (loading) return <p className="text-center mt-20">Loading Submission...</p>;
-    if (error) return <p className="text-center mt-20 text-red-500">Error: {error}</p>;
-    if (!details) return <p className="text-center mt-20">Submission Not Found</p>;
+    if (loading) return (
+        <div className="flex h-screen items-center justify-center bg-gray-50">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
+        </div>
+    );
+    
+    if (error) return (
+        <div className="flex h-screen items-center justify-center bg-gray-50 text-red-500">
+            Error: {error}
+        </div>
+    );
+    
+    if (!details) return (
+        <div className="flex h-screen items-center justify-center bg-gray-50 text-gray-500">
+            Submission Not Found
+        </div>
+    );
 
     return (
-        <main className="flex min-h-screen flex-col items-center p-12 md:p-24 bg-gray-50">
+        <main className="min-h-screen bg-gray-50 p-6 md:p-12">
             <GradingInterface initialDetails={details} />
         </main>
     );

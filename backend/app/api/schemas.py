@@ -144,7 +144,7 @@ class AIGradingRequest(BaseModel):
 
 class GradedAnswerResponse(BaseModel):
     question_id: int
-    score: int
+    score: float
     feedback: str
 
 class AIGradingResponse(BaseModel):
@@ -153,22 +153,35 @@ class AIGradingResponse(BaseModel):
 
 # --- Schemas for Student Grade Report ---
 class GradedAnswerReport(BaseModel):
+    id: int
+    question_id: int
     question_text: str
     student_answer: str
     correct_answer: str
-    score: int
+    score: float
     feedback: str
+
+    breakdown: Optional[Dict[str, Any]] = None
+    keywords: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 class GradeReportResponse(BaseModel):
     student_name: str
     quiz_title: str
-    overall_score: Optional[int] = None
+    overall_score: Optional[float] = None
     overall_feedback: Optional[str] = None
     graded_answers: List[GradedAnswerReport]
 
     model_config = ConfigDict(from_attributes=True)
+
+class GradeUpdateItem(BaseModel):
+    graded_answer_id: int
+    score: float
+    feedback: Optional[str] = None
+
+class BatchGradeUpdate(BaseModel):
+    updates: List[GradeUpdateItem]
 
 # --- Schemas for Lesson Plan Generation ---
 class Slide(BaseModel):

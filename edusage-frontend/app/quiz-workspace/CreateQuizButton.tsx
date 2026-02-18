@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { PlusCircle, Loader2 } from 'lucide-react';
 
 export default function CreateQuizButton() {
   const router = useRouter();
@@ -9,7 +10,6 @@ export default function CreateQuizButton() {
 
   const handleCreateQuiz = async () => {
     setIsLoading(true);
-
     try {
       const blankQuiz = {
         title: "Untitled Quiz",
@@ -26,25 +26,18 @@ export default function CreateQuizButton() {
       const res = await fetch(`${backendUrl}/quizzes/`, {
         method: 'POST',
         credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(blankQuiz),
       });
 
-      if (!res.ok) {
-        if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
-        throw new Error('Failed to create new quiz');
-      }
-
+      if (!res.ok) throw new Error('Failed');
       const newQuiz = await res.json();
       router.push(`/quiz-workspace/quiz/${newQuiz.id}`);
 
     } catch (error) {
-      console.error(error);
-      alert(error instanceof Error ? error.message : 'Could not create a new quiz.');
+      alert('Could not create a new quiz.');
     } finally {
-        setIsLoading(false); // Make sure loading stops even on error
+        setIsLoading(false);
     }
   };
 
@@ -52,9 +45,10 @@ export default function CreateQuizButton() {
     <button
       onClick={handleCreateQuiz}
       disabled={isLoading}
-      className="px-5 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+      className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all disabled:opacity-50"
     >
-      {isLoading ? 'Creating...' : '+ Create New Quiz'}
+      {isLoading ? <Loader2 size={18} className="animate-spin"/> : <PlusCircle size={18} />}
+      <span>Manual Create</span>
     </button>
   );
 }

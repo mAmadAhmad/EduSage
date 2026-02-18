@@ -1,6 +1,6 @@
 # app/models/quiz_models.py
 import secrets
-from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey, Float
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
@@ -71,7 +71,7 @@ class GradeReport(Base):
     id = Column(Integer, primary_key=True, index=True)
     submission_id = Column(Integer, ForeignKey("submissions.id"))
     grader = Column(String)  # "Teacher" or "AI"
-    overall_score = Column(Integer, nullable=True)
+    overall_score = Column(Float, nullable=True)
     overall_feedback = Column(Text, nullable=True)
 
     submission = relationship("Submission")
@@ -84,8 +84,13 @@ class GradedAnswer(Base):
     id = Column(Integer, primary_key=True, index=True)
     report_id = Column(Integer, ForeignKey("grade_reports.id"))
     answer_id = Column(Integer, ForeignKey("answers.id"))
-    score = Column(Integer)
+
+    score = Column(Float)
     feedback = Column(Text, nullable=True)
+
+    # --- COLUMNS FOR HYBRID EVIDENCE ---
+    breakdown = Column(JSON, nullable=True)  # Stores { "semantic_score": 0.8, "keyword_score": 0.5 ... }
+    keywords = Column(JSON, nullable=True)  # Stores { "matched": [...], "missing": [...] }
 
     report = relationship("GradeReport", back_populates="graded_answers")
     answer = relationship("Answer")
