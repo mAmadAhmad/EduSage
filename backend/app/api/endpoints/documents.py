@@ -17,7 +17,7 @@ async def ingest_document(file: UploadFile = File(...)):
     Ingests a PDF file:
     1. Loads the PDF content.
     2. Splits the text into manageable chunks.
-    3. Generates embeddings for each chunk.
+    3. Generates embeddings for eac/api/v1/submissions/3/gradesh chunk.
     4. Stores the chunks and their embeddings in Weaviate.
     """
     if not vector_service.weaviate_client or not vector_service.vector_store:

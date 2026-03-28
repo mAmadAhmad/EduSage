@@ -183,55 +183,6 @@ class GradeUpdateItem(BaseModel):
 class BatchGradeUpdate(BaseModel):
     updates: List[GradeUpdateItem]
 
-# --- Schemas for Lesson Plan Generation ---
-class Slide(BaseModel):
-    title: str
-    bullet_points: List[str]
-    speaker_notes: str
-
-class LessonPlanRequest(BaseModel):
-    source_document: Optional[str] = None
-    text_content: Optional[str] = None
-    instructions: str="Create a standard 45-minute lesson plan."
-    page_start: Optional[int] = None
-    page_end: Optional[int] = None
-
-class LessonPlanResponse(BaseModel):
-    lesson_title: str
-    learning_objectives: List[str]
-    key_concepts: List[str]
-    slides: List[Slide]
-    review_questions: List[QuestionCreate]
-
-class LessonPlanBase(BaseModel):
-    lesson_title: str
-    learning_objectives: List[str]
-    key_concepts: List[str]
-    slides: List[Slide]
-    review_questions: List[QuestionCreate]
-
-class LessonPlanCreate(LessonPlanBase):
-    pass
-
-class LessonPlan(LessonPlanBase):
-    id: int
-    model_config = ConfigDict(from_attributes=True)
-
-
-class SlideUpdate(Slide):
-    pass
-
-class LessonPlanUpdate(LessonPlanBase):
-    slides: List[SlideUpdate]
-
-
-class LessonPlanInfo(BaseModel):
-    id: int
-    lesson_title: str
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 # --- Schemas for User Authentication ---
 class UserBase(BaseModel):
     username: str
@@ -271,5 +222,24 @@ class QuickStudyResponse(BaseModel):
     quiz_data: List[Dict[str, Any]]
     report_data: Optional[List[Dict[str, Any]]] = None
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+# --- NEW: Lightweight schema for Student Dashboard List ---
+class MySubmissionSummary(BaseModel):
+    submission_id: int
+    quiz_title: str
+    student_name: str
+    score: Optional[float] = None
+    status: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class SubmissionListResponse(BaseModel):
+    id: int
+    student_name: str
+    student_roll_no: Optional[str] = None
+    answer_count: int
+    is_graded: bool
 
     model_config = ConfigDict(from_attributes=True)

@@ -6,7 +6,7 @@ logging.getLogger("uvicorn").setLevel(logging.WARNING)
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.services.vector_service import init_vector_service, close_vector_service
-from app.api.endpoints import documents, quizzes, student, submissions, content, auth, quick_study
+from app.api.endpoints import documents, quizzes, student, submissions, auth, quick_study
 from app.db import session
 from app.models import quiz_models, user_models, quick_study_model
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,5 +51,4 @@ app.include_router(documents.router, prefix="/api/v1/docs", tags=["Document and 
 app.include_router(quizzes.router, prefix="/api/v1/quizzes", tags=["Quiz Management"])
 app.include_router(student.router, prefix="/api/v1/take-quiz", tags=["Student Quiz Access"])
 app.include_router(submissions.router, prefix="/api/v1/submissions", tags=["Submission Management"])
-app.include_router(content.router, prefix="/api/v1/content", tags=["Lesson Plan Management"])
 app.include_router(quick_study.router, prefix="/api/v1/quick-study", tags=["Quick Study"])

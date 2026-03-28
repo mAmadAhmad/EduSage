@@ -74,33 +74,25 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
         setIsGrading(true);
         try {
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-            // Trigger the AI
             const res = await fetch(`${backendUrl}/submissions/${initialDetails.submission_id}/grade`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ grading_criteria: "Standard Hybrid Grading" }),
+                body: JSON.stringify({ grading_criteria: "Hybrid" }),
             });
 
             if (!res.ok) throw new Error('Grading failed');
             
-            // Re-fetch the report immediately to get the fresh data
-            const reportRes = await fetch(`${backendUrl}/submissions/${initialDetails.submission_id}/report`, {
-                credentials: 'include'
-            });
-            if(reportRes.ok) {
-                const reportData = await reportRes.json();
-                setReport(reportData);
-                router.refresh(); 
-            }
-
+            // We now directly set the DRAFT report returned by the POST
+            const draftReport = await res.json();
+            setReport(draftReport);
+            
         } catch (error) {
-            alert('An error occurred during grading.');
+            alert('An error occurred during AI drafting.');
         } finally {
             setIsGrading(false);
         }
     };
-
     // 2. Function to Handle Manual Score Edits (Local State Update)
     const handleScoreChange = (gradedAnswerId: number, newScore: string) => {
         if (!report) return;
@@ -128,11 +120,12 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
         try {
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
             
-            // Map local state to the schema expected by BatchGradeUpdate
+            // Map state to BatchGradeUpdate schema. 
+            // Note: In draft state, ans.id is actually the original answer.id.
             const updates = report.graded_answers.map(ans => ({
-                graded_answer_id: ans.id,
+                graded_answer_id: ans.id, 
                 score: ans.score,
-                feedback: ans.feedback // Sending feedback back in case we add editing for it later
+                feedback: ans.feedback 
             }));
 
             const res = await fetch(`${backendUrl}/submissions/${initialDetails.submission_id}/grades`, {
@@ -144,11 +137,11 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
 
             if (!res.ok) throw new Error('Failed to save');
             
-            alert('Grades updated successfully!');
-            router.refresh();
+            alert('Grades published successfully! Students can now view their results.');
+            router.push(`/quiz-workspace/quiz/${details.quiz_id}/submissions`);
 
         } catch (error) {
-            alert('Failed to save grades.');
+            alert('Failed to publish grades.');
         } finally {
             setIsSaving(false);
         }

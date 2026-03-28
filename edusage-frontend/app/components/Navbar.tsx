@@ -77,9 +77,7 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             {isLoggedIn ? (
                 <>
-                    <Link href="/quiz-workspace" className={linkClass}>Quiz</Link>
-                    <Link href="/slide-workspace" className={linkClass}>Slides</Link>
-                    
+                    <Link href="/quiz-workspace" className={linkClass}>Quiz</Link>                    
                     <div className={`border-l h-4 mx-2 ${isLandingPage ? 'border-gray-400' : 'border-gray-300'}`}></div>
                     
                     <button onClick={handleLogout} className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors">

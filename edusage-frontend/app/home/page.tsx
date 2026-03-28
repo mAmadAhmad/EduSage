@@ -59,22 +59,6 @@ export default function UserHomePage() {
               </div>
             </Link>
 
-            {/* Lesson Studio (Formerly Slide Workspace) */}
-            <Link href="/slide-workspace" className="group block bg-white rounded-2xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Presentation size={100} className="text-blue-600" />
-              </div>
-              <div className="relative z-10 flex items-start gap-4">
-                <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
-                  <Presentation size={32} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">Lesson Studio</h3>
-                  <p className="text-gray-600 mt-1">Generate structured lesson plans and presentation slides from your documents.</p>
-                </div>
-              </div>
-            </Link>
-
             {/* Quick Study (The New Feature Placeholder) */}
             <QuickStudyModal /> 
           </div>
@@ -99,18 +83,18 @@ export default function UserHomePage() {
                 </div>
               </Link>
               
-              {/* Placeholder for Results - we need a way to list student results later */}
-              <button disabled className="w-full text-left block p-5 hover:bg-gray-50 transition-colors opacity-50">
+              {/* Results Button - NOW ACTIVE */}
+              <Link href="/results" className="w-full text-left block p-5 hover:bg-gray-50 transition-colors border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-yellow-100 text-yellow-600 rounded-lg">
                     <Trophy size={20} />
                   </div>
                   <div>
                     <h4 className="font-bold text-gray-900">View My Results</h4>
-                    <p className="text-sm text-gray-500">Check your grades (Coming Soon)</p>
+                    <p className="text-sm text-gray-500">Check grades & feedback</p>
                   </div>
                 </div>
-              </button>
+              </Link>
             </div>
 
             {/* Placeholder for Recent Activity */}

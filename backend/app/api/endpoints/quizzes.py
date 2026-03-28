@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.api import schemas
 from app.crud import quiz_crud
 from app.db.dependencies import get_db
+from app.models import quiz_models
 # Import the security dependency
 from app.services.auth_service import get_current_user
 
@@ -53,8 +54,24 @@ def share_quiz(quiz_id: int, db: Session = Depends(get_db), current_user: schema
     session = quiz_crud.create_quiz_session(db=db, quiz_id=quiz_id)
     return {"share_code": session.share_code}
 
-@router.get("/{quiz_id}/submissions", response_model=List[schemas.Submission], summary="Get all submissions for a Quiz")
-def read_submissions_for_quiz(quiz_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
-    # Fetch submissions, ensuring they are for a quiz owned by the current user
+
+@router.get("/{quiz_id}/submissions", response_model=List[schemas.SubmissionListResponse],
+            summary="Get all submissions")
+def read_submissions_for_quiz(quiz_id: int, db: Session = Depends(get_db),
+                              current_user: schemas.User = Depends(get_current_user)):
     submissions = quiz_crud.get_submissions_for_quiz(db, quiz_id=quiz_id, user_id=current_user.id)
-    return submissions
+
+    result = []
+    for sub in submissions:
+        # Check if a grade report exists for this submission
+        is_graded = db.query(quiz_models.GradeReport).filter(
+            quiz_models.GradeReport.submission_id == sub.id).first() is not None
+
+        result.append({
+            "id": sub.id,
+            "student_name": sub.student_name,
+            "student_roll_no": sub.student_roll_no,
+            "answer_count": len(sub.answers),
+            "is_graded": is_graded
+        })
+    return result
