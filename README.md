@@ -58,23 +58,23 @@ As a final-year Software Engineering project focusing on AI systems, several arc
 
 ## 📂 Repository Structure
 
-\`\`\`bash
-EduSage/
-├── backend/                  # FastAPI application, AI logic, and DB models
-│   ├── app/
-│   │   ├── api/              # Route handlers (quizzes, submissions, student portal)
-│   │   ├── services/         # Core business logic (vector_service, grading_service)
-│   │   ├── models/           # SQLAlchemy schemas
-│   │   └── crud/             # Database interactions
-│   └── requirements.txt      
-└── edusage-frontend/         # Next.js web application
+```
+
+backend/                  # FastAPI application, AI logic, and DB models
+    ├── app/
+    │   ├── api/              # Route handlers (quizzes, submissions, student portal)
+    │   ├── services/         # Core business logic (vector_service, grading_service)
+    │   ├── models/           # SQLAlchemy schemas
+    │   └── crud/             # Database interactions
+    └── requirements.txt      
+edusage-frontend/         # Next.js web application
     ├── app/
     │   ├── quiz-workspace/   # Teacher dashboard & grading interface
     │   ├── take-quiz/        # Live quiz session UI
     │   ├── results/          # Grade reports and student history
     │   └── components/       # Reusable UI elements
     └── package.json
-\`\`\`
+```
 
 ---
 
