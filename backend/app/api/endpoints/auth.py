@@ -39,9 +39,9 @@ def login(response: Response, db: Session = Depends(get_db), form_data: OAuth2Pa
     response.set_cookie(
         key=auth_service.COOKIE_NAME,
         value=access_token,
-        httponly=True,  # JavaScript cannot access this
+        httponly=True,
         secure=False,  # Set to True in Production (HTTPS)
-        samesite="lax",  # Protects against CSRF
+        samesite="lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
 

@@ -10,7 +10,7 @@ from app.services.auth_service import get_current_user
 
 router = APIRouter()
 
-# --- NEW: Fetch history for logged-in user ---
+# --- Fetch history for logged-in user ---
 @router.get("/my-submissions", response_model=List[schemas.MySubmissionSummary],
             summary="Get history of quizzes taken by logged-in user")
 def get_my_submissions(db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):

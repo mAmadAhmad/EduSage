@@ -9,11 +9,6 @@ class QuickStudySession(Base):
     source_document = Column(String)
     created_at = Column(DATETIME(timezone=True), server_default=func.now())
 
-    # We store the entire quiz structure here as JSON
-    # Structure: [{question_text, type, options, correct_answer}, ...]
     quiz_data = Column(JSON)
-
-    # We store the user's answers and AI feedback here as JSON
-    # Structure: [{question_id, user_answer, is_correct, feedback}, ...]
 
     report_data = Column(JSON, nullable=True)

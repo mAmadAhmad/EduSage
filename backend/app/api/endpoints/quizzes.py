@@ -5,7 +5,6 @@ from app.api import schemas
 from app.crud import quiz_crud
 from app.db.dependencies import get_db
 from app.models import quiz_models
-# Import the security dependency
 from app.services.auth_service import get_current_user
 
 router = APIRouter()

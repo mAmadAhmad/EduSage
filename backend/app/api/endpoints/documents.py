@@ -1,9 +1,9 @@
 # app/api/endpoints/documents.py
 import os
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from langchain_community.document_loaders import PyPDFLoader
 import weaviate.classes as wvc
-from app.services import vector_service
+from app.services import vector_service, auth_service
 from app.core.config import settings
 from app.api import schemas
 from typing import List
@@ -11,94 +11,81 @@ from typing import List
 router = APIRouter()
 
 # --- Start: Ingest Endpoint ---
-@router.post("/ingest/", summary="Ingest a PDF document")
-async def ingest_document(file: UploadFile = File(...)):
+@router.post("/ingest/", summary="Ingest a PDF document securely into a user tenant")
+async def ingest_document(file: UploadFile = File(...), current_user: schemas.User = Depends(auth_service.get_current_user)):
     """
     Ingests a PDF file:
     1. Loads the PDF content.
     2. Splits the text into manageable chunks.
-    3. Generates embeddings for eac/api/v1/submissions/3/gradesh chunk.
+    3. Generates embeddings.
     4. Stores the chunks and their embeddings in Weaviate.
     """
-    if not vector_service.weaviate_client or not vector_service.vector_store:
+    if not vector_service.weaviate_client:
         raise HTTPException(status_code=503,
-                            detail="Weaviate database or vector store not initialized. Check server logs.")
+                            detail="Weaviate database not initialized.")
 
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDFs are supported.")
 
-    temp_file_path = ""  # Initialize to ensure it's always defined
+    tenant_id = f"user_{current_user.id}"
+    temp_file_path = f"/tmp/{file.filename}"
+
     try:
+        collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
+        # Ensure tenant exists and connect to user's isolated partition
         try:
-            # Overwrite if file chunks already exist
-            file_name = file.filename
+            collection.tenants.create(tenants=[wvc.tenant.Tenant(name=tenant_id)])
+        except Exception:
+            pass
 
-            # Get the collection object
-            my_collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
+        tenant_collection = collection.with_tenant(tenant_id)
+        # Delete older chunks of same file to save memory
+        file_name = file.filename
+        tenant_collection.data.delete_many(
+            where=wvc.query.Filter.by_property("source").equal(file_name)
+        )
+        print(f"Deleted existing chunks for '{file_name}' in tenant '{tenant_id}'.")
 
-            # Delete any existing objects from this source file
-            my_collection.data.delete_many(
-                where=wvc.query.Filter.by_property("source").equal(file_name)
-            )
-            print(f"Deleted existing chunks for '{file_name}'.")
-
-        except Exception as exc:
-            print(f"Error while deleting: {exc}")
-
-        # Save temp file to be used by PyPDFLoader
-        temp_file_path = f"/tmp/{file.filename}"
-        # Ensure the /tmp directory exists (important for Docker/Linux environments)
+        # Process the PDF
         os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
-
         with open(temp_file_path, "wb") as buffer:
             buffer.write(await file.read())
 
         loader = PyPDFLoader(temp_file_path)
         docs = loader.load_and_split(text_splitter=vector_service.text_splitter)
 
-        # --- START: NEW METADATA SANITIZATION LOGIC ---
-        # Clean the metadata of each document before further processing.
-        # This prevents schema validation errors with Weaviate.
-        for doc in docs:
-            # Preserve the essential 'page' metadata if it exists
-            page_number = doc.metadata.get("page", 0)
-            # Overwrite the metadata with a clean dictionary that
-            # only contains fields defined in our Weaviate schema.
-            doc.metadata = {
-                "source": file.filename,
-                "page": page_number}
+        # Generating data objects to insert into weaviate
+        objects_to_insert = []
 
-        # --- END: NEW METADATA SANITIZATION LOGIC ---
+        for index, doc in enumerate(docs):
+            vector = vector_service.embedding_model.embed_query(doc.page_content)
 
-        # --- Deduplication logic ---
-        unique_docs = []
-        seen_content = set()
-        for doc in docs:
-            # Check if we've already processed a chunk with this exact content
-            if doc.page_content not in seen_content:
-                seen_content.add(doc.page_content)
-                # Add metadata to the unique chunk
-                doc.metadata["source"] = file.filename
-                unique_docs.append(doc)
-                # LangChain's Weaviate integration maps Document.page_content to text_key
-                # and Document.metadata to other properties in Weaviate.
+            data_obj = wvc.data.DataObject(
+                properties={
+                    "content": doc.page_content,
+                    "source": file_name,
+                    "page": doc.metadata.get("page", 0),
+                    "chunk_index": index
+                },
+                vector=vector
+            )
+            objects_to_insert.append(data_obj)
 
-        # Ingest only the unique documents into Weaviate
-        # Using the async version of add_documents for FastAPI's async endpoint
-        if unique_docs:
-            await vector_service.vector_store.aadd_documents(unique_docs)
+        # Insertion to weaviate
+        if objects_to_insert:
+            response = tenant_collection.data.insert_many(objects_to_insert)
+            if response.has_errors:
+                print(f"Insertion errors: {response.errors}")
+                raise Exception("Failed to insert some chunks into weaviate.")
 
-        # Clean up the temporary file
         os.remove(temp_file_path)
+        return {"status": "success", "filename": file.filename, "total_chunks_found": len(objects_to_insert)}
 
-        return {"status": "success", "filename": file.filename, "total_chunks_found": len(docs),
-                "unique_chunks_ingested": len(unique_docs)}
     except Exception as exc:
-        # Also clean up the file in case of an error
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
-        print(f"Error during ingestion: {exc}")  # Log the full error for debugging
-        raise HTTPException(status_code=500, detail=f"An error occurred during ingestion: {exc}")
+        print(f"Error during ingestion: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 # --- End: Ingest Endpoint ---
 
@@ -106,43 +93,34 @@ async def ingest_document(file: UploadFile = File(...)):
 @router.post("/query/", response_model=schemas.QueryResponse, summary="Query the knowledge base")
 async def query_documents(request: schemas.QueryRequest):
     """
-    Performs similarity search in Weaviate to find relevant document chunks
+    Performs Hybrid Search (BM25 + Vector)
     """
-    if not vector_service.vector_store:
-        raise HTTPException(status_code=503, detail="Vector store not initialized.")
-
     try:
-        # Perform the similarity search
-        retrieved_docs = await vector_service.vector_store.asimilarity_search(
-            query=request.query,
-            k=request.top_k
-        )
+        objects = await vector_service.perform_hybrid_search(request.query, request.top_k, alpha=0.5)
 
-        if not retrieved_docs:
+        if not objects:
             return {"results": []}
 
-        # Format the results for response
-        results = [
-            schemas.Source(
-                content=doc.page_content,
-                source_file=doc.metadata.get("source", "Unknown"),
-                page=doc.metadata.get("page", 0)
-            )
-            for doc in retrieved_docs
+        results = [schemas.Source(
+            content=obj.properties.get("content", ""),
+            source_file=obj.properties.get("source", "unknown"),
+            page=obj.properties.get("page", 0)
+        )
+            for obj in objects
         ]
         return {"results": results}
+
     except Exception as exc:
-        print(f"Error during query: {exc}")  # Log the error for debugging
         raise HTTPException(status_code=500, detail=f"An error occurred during query: {exc}")
 
 # --- End: Query Endpoint ---
 
 # --- Start: RAG Query Endpoint ---
-@router.post("/rag_query/", response_model=schemas.RAGQueryResponse, summary="Query with RAG using Gemini")
+@router.post("/rag_query/", response_model=schemas.RAGQueryResponse, summary="Query with RAG using LLM")
 async def rag_query(request: schemas.QueryRequest):
     rag_chain = vector_service.get_rag_chain()
-    if not rag_chain:
-        raise HTTPException(status_code=503, detail="RAG chain is not initialized.")
+    if not rag_chain or vector_service.weaviate_client:
+        raise HTTPException(status_code=503, detail="RAG chain or weaviate client is not initialized.")
 
     try:
         # Filtering logic
@@ -154,29 +132,28 @@ async def rag_query(request: schemas.QueryRequest):
             ) & wvc.query.Filter.by_property("page").less_or_equal(
                 request.page_end
             )
-        # 1. Retrieve relevant documents
-        retrieved_docs = await vector_service.vector_store.asimilarity_search(
-            query=request.query, k=request.top_k, filters=weaviate_filter
-        )
 
-        if not retrieved_docs:
-            return schemas.RAGQueryResponse(answer="No relevant information found in documents.", sources=[])
+        objects = await vector_service.perform_hybrid_search(request.query, request.top_k, alpha=0.5, filters=weaviate_filter)
+
+        if not objects:
+            return schemas.RAGQueryResponse(answer="No relevant information found in documents", sources=[])
 
         # 2. Format context and invoke the RAG chain
-        context = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
+        retrieved_texts = [obj.properties.get("text", "") for obj in objects]
+        context = "\n\n---\n\n".join(retrieved_texts)
         answer = await vector_service.rag_chain.ainvoke({
             "context": context,
             "question": request.query
         })
 
-        # 3. Format sources with keyword arguments (THE FIX IS HERE)
+        # 3. Format sources
         sources = [
             schemas.Source(
-                content=doc.page_content,
-                source_file=doc.metadata.get("source", "Unknown"),
-                page=doc.metadata.get("page", 0)
+                content=obj.properties.get("text", ""),
+                source_file=obj.properties.get("source", "Unknown"),
+                page=obj.properties.get("page", 0)
             )
-            for doc in retrieved_docs
+            for obj in objects
         ]
 
         return schemas.RAGQueryResponse(answer=answer, sources=sources)

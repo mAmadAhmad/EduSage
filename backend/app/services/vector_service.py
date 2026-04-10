@@ -1,13 +1,14 @@
 # app/services/vector_service.py
-from langchain_groq import ChatGroq  # CHANGED: Import Groq
+from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 import weaviate
-from weaviate.classes.config import Property, DataType, Configure
+import weaviate.classes.config as wvc
 from langchain_weaviate import WeaviateVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.core.config import settings
+from app.services import vector_service
 
 # Global variables
 weaviate_client = None
@@ -15,7 +16,6 @@ embedding_model = None
 text_splitter = None
 vector_store = None
 
-# We now have TWO models
 llm_fast = None  # Llama 3.1 8b (Grading, Simple Tasks)
 llm_complex = None  # Llama 3.3 70b (Generation, RAG)
 
@@ -27,51 +27,47 @@ lesson_plan_chain = None
 
 def init_vector_service():
     """Initializes the base components."""
-    global weaviate_client, embedding_model, text_splitter, vector_store, llm_fast, llm_complex
+    global weaviate_client, embedding_model, text_splitter, llm_fast, llm_complex
     print("Initializing base vector service components...")
 
-    # 1. Embedding Model (Unchanged - HuggingFace)
+    # 1. Embedding Model
     embedding_model = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
 
-    # 2. Text Splitter (Unchanged)
+    # 2. Text Splitter
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=settings.TEXT_CHUNK_SIZE,
         chunk_overlap=settings.TEXT_CHUNK_OVERLAP
     )
 
-    # 3. Weaviate Connection (Unchanged)
+    # 3. Weaviate Connection
     weaviate_client = weaviate.connect_to_local()
     print("Successfully connected to Weaviate.")
 
+    # Schema creation
     if not weaviate_client.collections.exists(settings.WEAVIATE_COLLECTION):
+        print(f"Creating multi-tenant collection: {settings.WEAVIATE_COLLECTION}...")
         weaviate_client.collections.create(
             name=settings.WEAVIATE_COLLECTION,
             properties=[
-                Property(name="content", data_type=DataType.TEXT),
-                Property(name="source", data_type=DataType.TEXT),
-                Property(name="page", data_type=DataType.INT),
+                wvc.Property(name="content", data_type=wvc.DataType.TEXT, tokenization=wvc.Tokenization.WORD),
+                wvc.Property(name="source", data_type=wvc.DataType.TEXT, tokenization=wvc.Tokenization.FIELD),
+                wvc.Property(name="page", data_type=wvc.DataType.INT),
+                wvc.Property(name="chunk_index", data_type=wvc.DataType.INT),
             ],
-            vectorizer_config=Configure.Vectorizer.none(),
+            multi_tenancy_config=wvc.Configure.multi_tenancy(enabled=True, auto_tenant_creation=True),
+            vectorizer_config=wvc.Configure.Vectorizer.none(),
         )
-        print(f"Collection '{settings.WEAVIATE_COLLECTION}' created.")
-
-    vector_store = WeaviateVectorStore(
-        client=weaviate_client,
-        index_name=settings.WEAVIATE_COLLECTION,
-        text_key="content",
-        embedding=embedding_model,
-    )
     print("Vector Service Initialized.")
 
-    # 4. Initialize Groq Models (Plug and Play)
-    # Fast Model: Llama 3.1 8B Instant (Great for speed/grading)
+    # 4. Initialize Groq Models
+    # Fast Model: Llama 3.1 8B Instant
     llm_fast = ChatGroq(
         temperature=0,
         model_name="llama-3.1-8b-instant",
         api_key=settings.GROQ_API_KEY
     )
 
-    # Complex Model: Llama 3.3 70B Versatile (Great for generation/reasoning)
+    # Complex Model: Llama 3.3 70B Versatile
     llm_complex = ChatGroq(
         temperature=0,
         model_name="llama-3.3-70b-versatile",
@@ -110,7 +106,7 @@ def get_rag_chain():
 
 
 def get_quiz_chain():
-    """Quiz Generation - Uses Complex Model for instruction following."""
+    """Quiz Generation chain"""
     global quiz_generation_chain
     if quiz_generation_chain is None:
         print("Initializing Quiz Generation chain...")
@@ -157,7 +153,7 @@ def get_quiz_chain():
 
 
 def get_grading_chain():
-    """Grading - Uses Fast Model (8b) for speed and efficiency."""
+    """Grading chain"""
     global grading_chain
     if grading_chain is None:
         print("Initializing AI Grading chain...")
@@ -202,7 +198,31 @@ def get_grading_chain():
             }}
             """
         prompt = ChatPromptTemplate.from_template(grading_prompt_template)
-        # Using 8b here as requested - it is fast and good at evaluating text against a reference
         grading_chain = prompt | llm_fast | JsonOutputParser()
         print("AI Grading chain initialized.")
     return grading_chain
+
+
+async def perform_hybrid_search(query: str, top_k: int = 3, alpha: float = 0.5, filters=None):
+    """
+    Hybrid Search function for Weaviate
+    alpha=0.0 (Pure Keyword/BM25), alpha=1.0 (Pure Vector), alpha=0.5 (Equal Hybrid)
+    """
+    if not weaviate_client:
+        raise Exception("No weaviate client available")
+    collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
+
+    query_vector = embedding_model.embed_query(query)
+
+    response = collection.query.hybrid(
+        query=query,
+        vector=query_vector,
+        limit=top_k,
+        alpha=alpha,
+        return_properties=["content", "source", "page"],
+        filters=filters,
+    )
+
+    return response.objects
+
+

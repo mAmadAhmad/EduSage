@@ -9,9 +9,7 @@ from app.core.config import settings
 from app.api import schemas
 from app.crud import user_crud
 from app.db.dependencies import get_db
-from .security import verify_password
 
-# Define the standard cookie name
 COOKIE_NAME = "edusage_auth_token"
 
 # OAuth2PasswordBearer is needed for Swagger UI to work, but we primarily rely on cookies
@@ -33,7 +31,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> schemas.User:
     """
     Retrieves the JWT from the HTTP-only cookie and validates the user.
-    This is the single source of truth for authentication.
     """
     token = request.cookies.get(COOKIE_NAME)
 

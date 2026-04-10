@@ -11,8 +11,7 @@ class Quiz(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
     instructions = Column(Text, nullable=True)
-    # In the future, this would be a ForeignKey to a User model
-    teacher_id = Column(Integer, default=1) # Placeholder teacher ID
+    teacher_id = Column(Integer, default=1)
     user_id = Column(Integer, ForeignKey("users.id"))
 
     questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
@@ -88,7 +87,6 @@ class GradedAnswer(Base):
     score = Column(Float)
     feedback = Column(Text, nullable=True)
 
-    # --- COLUMNS FOR HYBRID EVIDENCE ---
     breakdown = Column(JSON, nullable=True)  # Stores { "semantic_score": 0.8, "keyword_score": 0.5 ... }
     keywords = Column(JSON, nullable=True)  # Stores { "matched": [...], "missing": [...] }
 

@@ -31,7 +31,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add this block to allow CORS requests from your Next.js frontend
+# CORS requests from Next.js frontend
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",

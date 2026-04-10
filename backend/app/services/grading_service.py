@@ -149,7 +149,7 @@ async def _generate_llm_evaluation(question, student_answer, correct_answer, sem
     Actual Output JSON:
     """)
 
-    # BIND JSON MODE: Critical for Llama 3.1
+    # BIND JSON MODE
     llm_json = vector_service.llm_fast.bind(response_format={"type": "json_object"})
 
     chain = prompt | llm_json | JsonOutputParser()

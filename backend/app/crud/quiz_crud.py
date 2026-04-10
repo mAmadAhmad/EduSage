@@ -46,7 +46,6 @@ def update_quiz(db: Session, quiz_id: int, quiz: schemas.QuizUpdate, user_id: in
     for question in db_quiz.questions:
         db.delete(question)
 
-    # Commit the delete before adding new ones to avoid potential conflicts
     db.commit()
 
     for q_in in quiz.questions:
@@ -119,7 +118,7 @@ def get_submissions_for_quiz(db: Session, quiz_id: int, user_id: int) -> List[qu
 def get_submission(db: Session, submission_id: int, user_id: int) -> quiz_models.Submission | None:
     # NOTE: For now we removed the user_id check on get_submission inside read_grade_report
     # to allow students to see it, but this function enforces it for teacher views.
-    # You might need a separate get_submission_public if you want stricter controls later.
+    # We might need a separate get_submission_public if we want stricter controls later.
     return db.query(quiz_models.Submission).filter(quiz_models.Submission.id == submission_id).first()
 
 
