@@ -1,4 +1,3 @@
-# app/api/schemas.py
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -17,8 +16,8 @@ class QuestionCreate(QuestionBase):
 class Question(QuestionBase):
     id: int
     quiz_id: int
-
     model_config = ConfigDict(from_attributes=True)
+
 
 # --- QUIZ SCHEMAS ---
 class QuizBase(BaseModel):
@@ -26,14 +25,14 @@ class QuizBase(BaseModel):
     instructions: Optional[str] = None
 
 class QuizCreate(QuizBase):
-    questions: List[QuestionCreate] # When creating a quiz, we pass a list of new questions
+    questions: List[QuestionCreate]
 
 class Quiz(QuizBase):
     id: int
-    teacher_id: int
-    questions: List[Question] = []  # The full quiz object will include its questions
-
+    user_id: int
+    questions: List[Question] = []
     model_config = ConfigDict(from_attributes=True)
+
 
 # --- AI GENERATION SCHEMAS ---
 class QuizGenerationRequest(BaseModel):
@@ -52,12 +51,14 @@ class GenerateQuizResponse(BaseModel):
     title: str
     questions: List[QuestionCreate]
 
-# --- Schemas for Updating Quizzes ---
+
+# --- UPDATE QUIZ SCHEMAS ---
 class QuestionUpdate(QuestionBase):
     id: Optional[int] = None
 
 class QuizUpdate(QuizBase):
     questions: List[QuestionUpdate]
+
 
 # --- RAG & QUERY SCHEMAS ---
 class QueryRequest(BaseModel):
@@ -65,6 +66,7 @@ class QueryRequest(BaseModel):
     top_k: int = 3
     page_start: Optional[int] = None
     page_end: Optional[int] = None
+
 class Source(BaseModel):
     content: str
     source_file: str
@@ -73,31 +75,26 @@ class Source(BaseModel):
 class QueryResponse(BaseModel):
     results: List[Source]
 
-# Schema for RAG response
 class RAGQueryResponse(BaseModel):
     answer: str
     sources: List[Source]
 
 
-# --- NEW: Public Schemas for Student Quiz-Taking ---
-# This version of a question EXCLUDES the correct_answer
+# --- PUBLIC STUDENT QUIZ SCHEMAS ---
 class PublicQuestion(BaseModel):
     id: int
     question_text: str
     question_type: str
     options: Optional[List[str]] = None
-
     model_config = ConfigDict(from_attributes=True)
 
-# This is the quiz object that will be sent to the student
 class PublicQuiz(QuizBase):
     id: int
     questions: List[PublicQuestion]
-
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- NEW: Schemas for Student Submissions ---
+# --- STUDENT SUBMISSION SCHEMAS ---
 class AnswerCreate(BaseModel):
     question_id: int
     answer_text: str
@@ -112,24 +109,20 @@ class SubmissionCreate(BaseModel):
     student_roll_no: Optional[str] = None
     answers: List[AnswerCreate]
 
-
 class Submission(SubmissionCreate):
     id: int
     quiz_session_id: int
     answers: List[Answer]
-
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- Schemas for the Grading View ---
+# --- GRADING VIEW SCHEMAS ---
 class GradedQuestion(BaseModel):
     question_id: int
     question_text: str
     student_answer: str
     correct_answer: str
-
     model_config = ConfigDict(from_attributes=True)
-
 
 class SubmissionDetail(BaseModel):
     submission_id: int
@@ -137,10 +130,10 @@ class SubmissionDetail(BaseModel):
     quiz_id: int
     quiz_title: str
     questions: List[GradedQuestion]
-
     model_config = ConfigDict(from_attributes=True)
 
-# --- Schemas for AI Grading ---
+
+# --- AI GRADING SCHEMAS ---
 class AIGradingRequest(BaseModel):
     grading_criteria: str = "Be a fair and helpful grader. Provide a score from 0 to 10 for each answer and brief feedback."
 
@@ -153,7 +146,8 @@ class AIGradingResponse(BaseModel):
     overall_feedback: str
     graded_answers: List[GradedAnswerResponse]
 
-# --- Schemas for Student Grade Report ---
+
+# --- STUDENT GRADE REPORT SCHEMAS ---
 class GradedAnswerReport(BaseModel):
     id: int
     question_id: int
@@ -162,10 +156,8 @@ class GradedAnswerReport(BaseModel):
     correct_answer: str
     score: float
     feedback: str
-
     breakdown: Optional[Dict[str, Any]] = None
     keywords: Optional[Dict[str, Any]] = None
-
     model_config = ConfigDict(from_attributes=True)
 
 class GradeReportResponse(BaseModel):
@@ -174,7 +166,6 @@ class GradeReportResponse(BaseModel):
     overall_score: Optional[float] = None
     overall_feedback: Optional[str] = None
     graded_answers: List[GradedAnswerReport]
-
     model_config = ConfigDict(from_attributes=True)
 
 class GradeUpdateItem(BaseModel):
@@ -185,30 +176,27 @@ class GradeUpdateItem(BaseModel):
 class BatchGradeUpdate(BaseModel):
     updates: List[GradeUpdateItem]
 
-# --- Schemas for User Authentication ---
+
+# --- USER AUTHENTICATION SCHEMAS ---
 class UserBase(BaseModel):
     username: str
 
-
 class UserCreate(UserBase):
     password: str
-
 
 class User(UserBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
-
 class Token(BaseModel):
     access_token: str
     token_type: str
-
 
 class TokenData(BaseModel):
     username: Optional[str] = None
 
 
-# --- Quick Study Schemas ---
+# --- QUICK STUDY SCHEMAS ---
 class QuickStudyCreate(BaseModel):
     source_document: Optional[str] = None
     text_content: Optional[str] = None
@@ -224,17 +212,16 @@ class QuickStudyResponse(BaseModel):
     quiz_data: List[Dict[str, Any]]
     report_data: Optional[List[Dict[str, Any]]] = None
     created_at: datetime
-
     model_config = ConfigDict(from_attributes=True)
 
-# --- NEW: Lightweight schema for Student Dashboard List ---
+
+# --- DASHBOARD LIST SCHEMAS ---
 class MySubmissionSummary(BaseModel):
     submission_id: int
     quiz_title: str
     student_name: str
     score: Optional[float] = None
     status: str
-
     model_config = ConfigDict(from_attributes=True)
 
 class SubmissionListResponse(BaseModel):
@@ -243,5 +230,4 @@ class SubmissionListResponse(BaseModel):
     student_roll_no: Optional[str] = None
     answer_count: int
     is_graded: bool
-
     model_config = ConfigDict(from_attributes=True)

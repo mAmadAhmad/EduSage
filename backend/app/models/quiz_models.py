@@ -1,4 +1,3 @@
-# app/models/quiz_models.py
 import secrets
 from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey, Float
 from sqlalchemy.orm import relationship, declarative_base
@@ -11,7 +10,6 @@ class Quiz(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
     instructions = Column(Text, nullable=True)
-    teacher_id = Column(Integer, default=1)
     user_id = Column(Integer, ForeignKey("users.id"))
 
     questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
@@ -23,7 +21,7 @@ class Question(Base):
     quiz_id = Column(Integer, ForeignKey("quizzes.id"))
     question_text = Column(Text, nullable=False)
     question_type = Column(String, default="MCQ")
-    options = Column(JSON, nullable=True) # For MCQs
+    options = Column(JSON, nullable=True)
     source_citation = Column(JSON, nullable=True)
     correct_answer = Column(Text, nullable=False)
 
@@ -38,7 +36,6 @@ class QuizSession(Base):
 
     quiz = relationship("Quiz")
 
-
 class Submission(Base):
     __tablename__ = "submissions"
 
@@ -51,7 +48,6 @@ class Submission(Base):
     quiz_session = relationship("QuizSession")
     answers = relationship("Answer", back_populates="submission", cascade="all, delete-orphan")
 
-
 class Answer(Base):
     __tablename__ = "answers"
 
@@ -63,19 +59,17 @@ class Answer(Base):
     submission = relationship("Submission", back_populates="answers")
     question = relationship("Question")
 
-# NEW: Add these classes for storing grade reports
 class GradeReport(Base):
     __tablename__ = "grade_reports"
 
     id = Column(Integer, primary_key=True, index=True)
     submission_id = Column(Integer, ForeignKey("submissions.id"))
-    grader = Column(String)  # "Teacher" or "AI"
+    grader = Column(String)
     overall_score = Column(Float, nullable=True)
     overall_feedback = Column(Text, nullable=True)
 
     submission = relationship("Submission")
     graded_answers = relationship("GradedAnswer", back_populates="report", cascade="all, delete-orphan")
-
 
 class GradedAnswer(Base):
     __tablename__ = "graded_answers"
@@ -86,9 +80,8 @@ class GradedAnswer(Base):
 
     score = Column(Float)
     feedback = Column(Text, nullable=True)
-
-    breakdown = Column(JSON, nullable=True)  # Stores { "semantic_score": 0.8, "keyword_score": 0.5 ... }
-    keywords = Column(JSON, nullable=True)  # Stores { "matched": [...], "missing": [...] }
+    breakdown = Column(JSON, nullable=True)
+    keywords = Column(JSON, nullable=True)
 
     report = relationship("GradeReport", back_populates="graded_answers")
     answer = relationship("Answer")

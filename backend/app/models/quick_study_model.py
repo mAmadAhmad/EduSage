@@ -8,7 +8,5 @@ class QuickStudySession(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     source_document = Column(String)
     created_at = Column(DATETIME(timezone=True), server_default=func.now())
-
     quiz_data = Column(JSON)
-
     report_data = Column(JSON, nullable=True)

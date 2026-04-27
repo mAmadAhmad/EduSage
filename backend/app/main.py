@@ -23,6 +23,7 @@ async def lifespan(_app: FastAPI):
     init_vector_service()
     yield
     # On shutdown
+
     close_vector_service()
 
 app = FastAPI(
@@ -31,10 +32,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS requests from Next.js frontend
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://10.8.161.85:3000"
 ]
 
 app.add_middleware(
@@ -45,7 +46,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include the API router
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(documents.router, prefix="/api/v1/docs", tags=["Document and RAQ Ops"])
 app.include_router(quizzes.router, prefix="/api/v1/quizzes", tags=["Quiz Management"])

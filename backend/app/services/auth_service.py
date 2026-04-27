@@ -12,20 +12,18 @@ from app.crud import user_crud
 from app.db.dependencies import get_db
 
 COOKIE_NAME = "edusage_auth_token"
-
-# OAuth2PasswordBearer is needed for Swagger UI to work, but we primarily rely on cookies
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-
-# ---  Password Hashing ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
+
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
-# --- JWT Token Creation ---
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
@@ -37,11 +35,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-# --- THE CORE SECURITY DEPENDENCY (Cookie-Based) ---
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> schemas.User:
-    """
-    Retrieves the JWT from the HTTP-only cookie and validates the user.
-    """
     token = request.cookies.get(COOKIE_NAME)
 
     if not token:
@@ -63,4 +57,5 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> schemas
     user = user_crud.get_user_by_username(db, username=token_data.username)
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
+
     return user

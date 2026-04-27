@@ -1,4 +1,3 @@
-# app/models/user_models.py
 from sqlalchemy import Column, Integer, String
 from .quiz_models import Base
 
