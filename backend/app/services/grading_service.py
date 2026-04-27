@@ -121,37 +121,29 @@ def _calculate_keyword_match(student_text: str, keywords: list):
 
 async def _generate_llm_evaluation(question, student_answer, correct_answer, semantic_score, keyword_score,
                                    matched_keywords, missing_keywords, context):
-    # Stronger Prompt with explicit JSON structure example
     prompt = ChatPromptTemplate.from_template("""
-    You are a strict grading API. Analyze the student submission based on the provided metrics and return a JSON object.
+    You are a strict and highly analytical grading API. Evaluate the logical correctness of the student's answer.
 
     Question: {question}
     Correct Answer: {correct_answer}
     Student Answer: {student_answer}
-    Context: {context}
+    Reference Context: {context}
 
-    --- METRICS ---
-    Semantic Similarity (Math Score): {semantic_score:.2f} / 1.0
-    Keyword Match Score: {keyword_score:.2f} / 1.0
-    Keywords Found: {matched_keywords}
-    Keywords Missing: {missing_keywords}
+    --- BACKGROUND METRICS ---
+    Semantic Similarity: {semantic_score:.2f}/1.0
+    Missing Keywords: {missing_keywords}
 
     INSTRUCTIONS:
-    1. If Semantic Score is high (>0.85) but keywords are missing, give a good score but mention the missing terms.
-    2. If Semantic Score is low (<0.5) but keywords are present, check if they are used in the wrong context.
-    3. Provide a score (integer 0-10) and brief feedback string.
+    1. DO NOT simply restate the background metrics. Use them only to guide your scrutiny.
+    2. Focus strictly on logical reasoning: actively hunt for misconceptions, incorrect negations, or flawed justifications in the student's text.
+    3. If the student includes factually incorrect statements or defends a wrong concept (even if they used the correct keywords), penalize the score and explicitly explain the logical flaw.
+    4. Provide an integer "score" (0-10) based on conceptual accuracy, and a specific "feedback" string.
 
-    You MUST output ONLY valid JSON. No Markdown. No conversational text.
-
-    Example Output:
-    {{ "score": 8, "feedback": "Good answer, but missing specific terminology." }}
-
-    Actual Output JSON:
+    You MUST output ONLY valid JSON with keys "score" and "feedback".
+        
     """)
 
-    # BIND JSON MODE
     llm_json = vector_service.llm_fast.bind(response_format={"type": "json_object"})
-
     chain = prompt | llm_json | JsonOutputParser()
 
     return await chain.ainvoke({
@@ -160,7 +152,5 @@ async def _generate_llm_evaluation(question, student_answer, correct_answer, sem
         "student_answer": student_answer,
         "context": context,
         "semantic_score": semantic_score,
-        "keyword_score": keyword_score,
-        "matched_keywords": matched_keywords,
         "missing_keywords": missing_keywords
     })

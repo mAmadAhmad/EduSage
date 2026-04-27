@@ -45,6 +45,8 @@ class QuizGenerationRequest(BaseModel):
     page_start: Optional[int] = None
     page_end: Optional[int] = None
     custom_instructions: Optional[str] = None
+    whole_document: bool = False
+    chapter: Optional[str] = None
 
 class GenerateQuizResponse(BaseModel):
     title: str

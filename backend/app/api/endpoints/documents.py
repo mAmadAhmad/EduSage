@@ -3,23 +3,18 @@ import os
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from langchain_community.document_loaders import PyPDFLoader
 import weaviate.classes as wvc
+from weaviate.classes.tenants import Tenant
 from app.services import vector_service, auth_service
+from app.services.rag import generation, ingestion
 from app.core.config import settings
 from app.api import schemas
 from typing import List
-
 router = APIRouter()
 
 # --- Start: Ingest Endpoint ---
 @router.post("/ingest/", summary="Ingest a PDF document securely into a user tenant")
 async def ingest_document(file: UploadFile = File(...), current_user: schemas.User = Depends(auth_service.get_current_user)):
-    """
-    Ingests a PDF file:
-    1. Loads the PDF content.
-    2. Splits the text into manageable chunks.
-    3. Generates embeddings.
-    4. Stores the chunks and their embeddings in Weaviate.
-    """
+
     if not vector_service.weaviate_client:
         raise HTTPException(status_code=503,
                             detail="Weaviate database not initialized.")
@@ -34,52 +29,40 @@ async def ingest_document(file: UploadFile = File(...), current_user: schemas.Us
         collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
         # Ensure tenant exists and connect to user's isolated partition
         try:
-            collection.tenants.create(tenants=[wvc.tenant.Tenant(name=tenant_id)])
-        except Exception:
-            pass
+            if tenant_id not in collection.tenants.get():
+                collection.tenants.create(tenants=[Tenant(name=tenant_id)])
+        except Exception as e:
+            print(f"  [Notice] Tenant setup: {e}")
 
         tenant_collection = collection.with_tenant(tenant_id)
         # Delete older chunks of same file to save memory
         file_name = file.filename
-        tenant_collection.data.delete_many(
-            where=wvc.query.Filter.by_property("source").equal(file_name)
-        )
-        print(f"Deleted existing chunks for '{file_name}' in tenant '{tenant_id}'.")
+        try:
+            tenant_collection.data.delete_many(
+                where=wvc.query.Filter.by_property("source").equal(file_name)
+            )
+            print(f"Deleted existing chunks for '{file_name}' in tenant '{tenant_id}'.")
+        except Exception as e:
+            print(f"  [Notice] Delete old chunks: {e}")
 
         # Process the PDF
         os.makedirs(os.path.dirname(temp_file_path), exist_ok=True)
         with open(temp_file_path, "wb") as buffer:
             buffer.write(await file.read())
 
-        loader = PyPDFLoader(temp_file_path)
-        docs = loader.load_and_split(text_splitter=vector_service.text_splitter)
-
-        # Generating data objects to insert into weaviate
-        objects_to_insert = []
-
-        for index, doc in enumerate(docs):
-            vector = vector_service.embedding_model.embed_query(doc.page_content)
-
-            data_obj = wvc.data.DataObject(
-                properties={
-                    "content": doc.page_content,
-                    "source": file_name,
-                    "page": doc.metadata.get("page", 0),
-                    "chunk_index": index
-                },
-                vector=vector
-            )
-            objects_to_insert.append(data_obj)
-
-        # Insertion to weaviate
-        if objects_to_insert:
-            response = tenant_collection.data.insert_many(objects_to_insert)
-            if response.has_errors:
-                print(f"Insertion errors: {response.errors}")
-                raise Exception("Failed to insert some chunks into weaviate.")
-
+        # call to ingestion function
+        chunks_inserted, toc = await ingestion.process_and_ingest_pdf(
+            file_path=temp_file_path,
+            file_name=file_name,
+            tenant_collection=tenant_collection
+        )
         os.remove(temp_file_path)
-        return {"status": "success", "filename": file.filename, "total_chunks_found": len(objects_to_insert)}
+        return {
+            "status": "success",
+            "filename": file_name,
+            "total_chunks_found": chunks_inserted,
+            "table_of_contents": toc
+        }
 
     except Exception as exc:
         if os.path.exists(temp_file_path):
@@ -164,57 +147,20 @@ async def rag_query(request: schemas.QueryRequest):
 
 # --- Start: Quiz Generation Endpoint ---
 @router.post("/quiz/generate/", response_model=schemas.GenerateQuizResponse, summary="Generate Quiz from a document")
-async def generate_quiz(request: schemas.QuizGenerationRequest):
-    quiz_chain = vector_service.get_quiz_chain()
-    if not quiz_chain:
+async def generate_quiz(request: schemas.QuizGenerationRequest, current_user: schemas.User = Depends(auth_service.get_current_user)):
+    if not vector_service.get_quiz_chain():
         raise HTTPException(status_code=503, detail="Quiz generation chain is not initialized.")
 
+    # User ID to Weaviate Tenant ID
+    tenant_id = f"user_{current_user.id}"
+
     try:
-        context = ""
-
-        if request.text_content:
-            print("Using raw text content for generation.")
-            context = request.text_content
-
-        elif request.source_document:
-            print(f"Generating quiz for document: {request.source_document}")
-
-            filters = wvc.query.Filter.by_property("source").equal(request.source_document)
-
-            if request.page_start is not None and request.page_end is not None:
-                page_filter = wvc.query.Filter.by_property("page").greater_or_equal(
-                    request.page_start
-                ) & wvc.query.Filter.by_property("page").less_or_equal(
-                    request.page_end
-                )
-
-                filters = filters & page_filter
-
-            collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
-
-            response = collection.query.fetch_objects(
-                limit=50,
-                filters=filters
-            )
-
-            if not response.objects:
-                raise HTTPException(status_code=404, detail=f"Document '{request.source_document}' not found or has no content.")
-
-            context = "\n\n--\n\n".join([obj.properties['content'] for obj in response.objects])
-
-        else:
-            raise HTTPException(status_code=400, detail="Either source_document or text_content must be provided.")
-
-        # 2. invoke the chain with all required inputs
-        quiz_json = await vector_service.quiz_generation_chain.ainvoke({
-            "num_mcq": request.num_mcq,
-            "num_short_answer": request.num_short_answer,
-            "difficulty": request.difficulty,
-            "context": context,
-            "custom_instructions": request.custom_instructions or "None"
-        })
+        quiz_json = await generation.generate_quiz_context_and_invoke(request, tenant_id)
 
         return quiz_json
+
+    except ValueError as val_err:
+        raise HTTPException(status_code=404, detail=str(val_err))
     except Exception as exc:
         print(f"Error during quiz generation: {exc}")
         raise HTTPException(status_code=500, detail=f"An error occurred during quiz generation: {str(exc)}")
@@ -245,12 +191,13 @@ async def wipe_collection_data():
 
 # --- NEW: List Documents Endpoint ---
 @router.get("/list", response_model=List[str], summary="List all available documents")
-def list_documents():
+def list_documents(current_user: schemas.User = Depends(auth_service.get_current_user)):
     if not vector_service.weaviate_client:
         raise HTTPException(status_code=503, detail="Weaviate client not available.")
 
     try:
-        collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
+        tenant_id = f"user_{current_user.id}"
+        collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION).with_tenant(tenant_id)
 
         # Fetching just the 'source' property for up to 1000 chunks
         response = collection.query.fetch_objects(
@@ -261,11 +208,37 @@ def list_documents():
         sources = set()
         for obj in response.objects:
             src = obj.properties.get("source")
-            # Filter out temporary text files so they don't clutter the UI
             if src and not src.startswith("temp_text_"):
                 sources.add(src)
 
         return list(sources)
     except Exception as e:
         print(f"Error listing docs: {e}")
+        return []
+
+
+@router.get("/{filename}/chapters", response_model=List[str], summary="Get unique chapters for a document")
+def get_document_chapters(filename: str, current_user: schemas.User = Depends(auth_service.get_current_user)):
+    if not vector_service.weaviate_client:
+        raise HTTPException(status_code=503, detail="Weaviate client not available.")
+    try:
+        tenant_id = f"user_{current_user.id}"
+        collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION).with_tenant(tenant_id)
+
+        response = collection.query.fetch_objects(
+            filters=wvc.query.Filter.by_property("source").equal(filename),
+            return_properties=["chapter"],
+            limit=2000
+        )
+
+        # Extract unique chapters
+        chapters = set()
+        for obj in response.objects:
+            ch = obj.properties.get("chapter")
+            if ch and ch != "Unknown Chapter":
+                chapters.add(ch)
+
+        return sorted(list(chapters))
+    except Exception as e:
+        print(f"Error fetching chapters: {e}")
         return []

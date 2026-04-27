@@ -12,6 +12,8 @@ from app.services import vector_service, grading_service
 from app.services.auth_service import get_current_user
 from app.models import quiz_models
 from app.core.config import settings
+from app.services.rag import retrieval
+from app.services.vector_service import perform_hybrid_search
 
 router = APIRouter()
 
@@ -26,7 +28,7 @@ def read_submission_details(submission_id: int, db: Session = Depends(get_db),
     return db_submission_details
 
 
-@router.post("/{submission_id}/grade", summary="Draft AI Grades (Does NOT save to DB)")
+@router.post("/{submission_id}/grade", summary="Draft AI Grades Does NOT save to DB")
 async def grade_submission_with_ai(
         submission_id: int,
         request: schemas.AIGradingRequest,
@@ -37,26 +39,13 @@ async def grade_submission_with_ai(
     if not submission or submission.quiz_session.quiz.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    # Context Retrieval
-    reference_context = ""
-    source_doc = None
-    if submission.answers and submission.answers[0].question.source_citation:
-        source_doc = submission.answers[0].question.source_citation.get("source_file")
-
-    if source_doc:
-        try:
-            filters = wvc.query.Filter.by_property("source").equal(source_doc)
-            collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
-            response = collection.query.fetch_objects(limit=40, filters=filters)
-            if response.objects:
-                reference_context = "\n\n".join([obj.properties['content'] for obj in response.objects])
-        except Exception:
-            pass
+    tenant_id = f"user_{current_user.id}"
 
     # Drafting Loop
     draft_answers = []
     subjective_tasks = []
     subjective_map = []
+    question_context = {}
 
     for answer in submission.answers:
         question = answer.question
@@ -65,7 +54,7 @@ async def grade_submission_with_ai(
         if question.question_type == "MCQ":
             is_correct = user_ans.strip().lower() == question.correct_answer.strip().lower()
             draft_answers.append({
-                "id": answer.id, # We use answer.id temporarily for mapping
+                "id": answer.id,
                 "question_id": question.id,
                 "question_text": question.question_text,
                 "student_answer": user_ans,
@@ -73,9 +62,26 @@ async def grade_submission_with_ai(
                 "score": 10.0 if is_correct else 0.0,
                 "feedback": "Correct!" if is_correct else f"Incorrect. Correct answer: {question.correct_answer}",
                 "breakdown": None,
-                "keywords": None
+                "keywords": None,
+                "reference_evidence": None
             })
         else:
+            reference_context = ''
+            source_doc = question.source_citation.get('source_file') if question.source_citation else None
+            if source_doc:
+                filters = wvc.query.Filter.by_property('source').equal(source_doc)
+                search_query = f'{question.question_text} {question.correct_answer}'
+
+                retrieved_chunks = await retrieval.perform_hybrid_search(
+                    query=search_query,
+                    tenant_id=tenant_id,
+                    top_k=3,
+                    filters=filters,
+                )
+                reference_context = "\n\n".join(retrieved_chunks)
+
+            question_context[answer.id] = reference_context
+
             task = grading_service.calculate_hybrid_grade(
                 question_text=question.question_text, correct_answer=question.correct_answer,
                 student_answer=user_ans, reference_context=reference_context
@@ -95,10 +101,11 @@ async def grade_submission_with_ai(
                 "score": result['final_score'],
                 "feedback": result['feedback'],
                 "breakdown": result['breakdown'],
-                "keywords": result['keywords']
+                "keywords": result['keywords'],
+                "reference_evidence": question_context.get(answer.id, "No reference found.")
             })
 
-    # Return DRAFT data (Matches the GradeReportResponse schema visually)
+    # Return DRAFT data
     return {
         "student_name": submission.student_name,
         "quiz_title": submission.quiz_session.quiz.title,
@@ -109,7 +116,6 @@ async def grade_submission_with_ai(
 
 @router.get("/{submission_id}/report", response_model=schemas.GradeReportResponse, summary="Get the grade report")
 def read_grade_report(submission_id: int, db: Session = Depends(get_db)):
-    # ... (Fetch submission and report as before) ...
     db_submission = db.query(quiz_models.Submission).filter(quiz_models.Submission.id == submission_id).first()
     if not db_submission:
         raise HTTPException(status_code=404, detail="Submission not found")
@@ -121,8 +127,8 @@ def read_grade_report(submission_id: int, db: Session = Depends(get_db)):
     graded_answers_data = []
     for ga in db_report.graded_answers:
         graded_answers_data.append({
-            "id": ga.id,  # <--- Pass the ID
-            "question_id": ga.answer.question_id,  # <--- Pass Question ID
+            "id": ga.id,
+            "question_id": ga.answer.question_id,
             "question_text": ga.answer.question.question_text,
             "student_answer": ga.answer.answer_text,
             "correct_answer": ga.answer.question.correct_answer,

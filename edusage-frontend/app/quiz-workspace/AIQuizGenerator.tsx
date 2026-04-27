@@ -13,6 +13,7 @@ export default function AIQuizGenerator() {
   // State
   const [sourceDoc, setSourceDoc] = useState('');
   const [rawText, setRawText] = useState('');
+  const [chapter, setChapter] = useState<string | undefined>(undefined);
   const [numMcq, setNumMcq] = useState<number | ''>(3);
   const [numShortAnswer, setNumShortAnswer] = useState<number | ''>(2);
   const [pageStart, setPageStart] = useState<number | ''>('');
@@ -23,8 +24,9 @@ export default function AIQuizGenerator() {
   
   const router = useRouter();
 
-  const handleContextSelection = (value: string, type: 'file' | 'text') => {
+  const handleContextSelection = (value: string, type: 'file' | 'text', selectedChapter?: string) => {
       setInputType(type);
+      setChapter(selectedChapter);
       if (type === 'file') {
           setSourceDoc(value);
           setRawText('');
@@ -35,7 +37,7 @@ export default function AIQuizGenerator() {
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevents multiple rapid submissions
     
     // Validation
     if (inputType === 'file' && !sourceDoc) {
@@ -51,6 +53,8 @@ export default function AIQuizGenerator() {
     
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+      const isWholeDocument = customInstructions.trim() === '';
+      
       const payload = {
         source_document: inputType === 'file' ? sourceDoc : null,
         text_content: inputType === 'text' ? rawText : null,  
@@ -59,7 +63,9 @@ export default function AIQuizGenerator() {
         difficulty: difficulty,
         page_start: pageStart === '' ? null : pageStart,
         page_end: pageEnd === '' ? null : pageEnd,
-        custom_instructions: customInstructions || "Please generate a standard quiz."
+        custom_instructions: customInstructions.trim() || null,
+        chapter: chapter || null,
+        whole_document: isWholeDocument // Dynamically handles full file OR full chapter sampling
       };
 
       // 1. Generate
@@ -173,11 +179,14 @@ export default function AIQuizGenerator() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Custom Instructions</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Targeted Search Keywords (Optional)</label>
                     <textarea value={customInstructions}
                               onChange={(e) => setCustomInstructions(e.target.value)}
-                              rows={2} placeholder="e.g., Focus on definitions and key dates..."
+                              rows={2} placeholder="e.g., Focus strictly on technical definitions, algorithms, and mathematical formulas..."
                               className="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-gray-900"/>
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 <strong>Hint:</strong> This acts as a database search query. Use specific keywords rather than conversational sentences. Leave blank to sample the entire document or selected chapter.
+                    </p>
                   </div>
                   
                   <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">

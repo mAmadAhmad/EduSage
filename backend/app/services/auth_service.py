@@ -4,6 +4,7 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from passlib.context import CryptContext
 
 from app.core.config import settings
 from app.api import schemas
@@ -15,7 +16,16 @@ COOKIE_NAME = "edusage_auth_token"
 # OAuth2PasswordBearer is needed for Swagger UI to work, but we primarily rely on cookies
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
+# ---  Password Hashing ---
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+# --- JWT Token Creation ---
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
@@ -27,7 +37,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-# --- THE CORE SECURITY DEPENDENCY ---
+# --- THE CORE SECURITY DEPENDENCY (Cookie-Based) ---
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> schemas.User:
     """
     Retrieves the JWT from the HTTP-only cookie and validates the user.
