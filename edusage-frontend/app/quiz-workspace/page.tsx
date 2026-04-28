@@ -5,11 +5,16 @@ import Link from 'next/link';
 import CreateQuizButton from './CreateQuizButton';
 import AIQuizGenerator from './AIQuizGenerator';
 import QuizActions from './QuizActions';
-import { LayoutGrid, GraduationCap, Clock, HelpCircle } from 'lucide-react';
+import { LayoutGrid, GraduationCap, HelpCircle } from 'lucide-react';
 
 interface Question { id: number; question_text: string; }
 interface Quiz { id: number; title: string; instructions: string | null; questions: Question[]; }
 
+/**
+ * DashboardPage (Quiz Workspace)
+ * * Fetches and displays all quizzes belonging to the authenticated user.
+ * Implements optimistic UI updates for child component deletions.
+ */
 export default function DashboardPage() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +39,14 @@ export default function DashboardPage() {
     fetchQuizzes();
   }, []);
 
+  /**
+   * Optimistically updates the UI by filtering out the deleted quiz.
+   * Passed to the QuizActions child component.
+   */
+  const handleRemoveQuizFromState = (deletedQuizId: number) => {
+    setQuizzes((prevQuizzes) => prevQuizzes.filter(q => q.id !== deletedQuizId));
+  };
+
   if (loading) return (
     <div className="flex h-screen items-center justify-center bg-gray-50">
       <div className="animate-pulse flex flex-col items-center">
@@ -47,7 +60,6 @@ export default function DashboardPage() {
     <main className="min-h-screen bg-gray-50 p-6 md:p-12">
       <div className="max-w-7xl mx-auto">
         
-        {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -61,7 +73,6 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        {/* Content Section */}
         {error ? (
           <div className="bg-red-50 text-red-600 p-4 rounded-lg border border-red-200">
             Error loading workspace: {error}
@@ -71,7 +82,6 @@ export default function DashboardPage() {
             {quizzes.map((quiz) => (
               <div key={quiz.id} className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-purple-200 transition-all duration-200 flex flex-col h-full">
                  
-                 {/* Card Body */}
                  <Link href={`/quiz-workspace/quiz/${quiz.id}`} className="p-6 flex-grow block">
                     <div className="flex justify-between items-start">
                       <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-4 group-hover:bg-purple-50 group-hover:text-purple-600 transition-colors">
@@ -90,15 +100,17 @@ export default function DashboardPage() {
                     </p>
                  </Link>
                 
-                 {/* Card Footer (Actions) */}
                  <div className="px-6 pb-6 mt-auto">
-                    <QuizActions quizId={quiz.id} />
+                    {/* Pass the callback directly to the child */}
+                    <QuizActions 
+                        quizId={quiz.id} 
+                        onDeleteSuccess={() => handleRemoveQuizFromState(quiz.id)} 
+                    />
                  </div>
               </div>
             ))}
           </div>
         ) : (
-           // Empty State
            <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center max-w-lg mx-auto mt-10">
              <div className="mx-auto h-16 w-16 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center mb-4">
                <HelpCircle size={32} />

@@ -4,22 +4,44 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+/**
+ * Navbar Component
+ * * Global navigation header. Subscribes to custom browser events to maintain
+ * synchronous authentication state across tabs and components.
+ * Dynamically adjusts styling (fixed transparent vs. sticky solid) based on the current route.
+ */
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Helper to check login status
   const checkLoginStatus = () => {
     const userState = typeof window !== 'undefined' ? localStorage.getItem('userState') : null;
     setIsLoggedIn(!!userState);
   };
 
   useEffect(() => {
-    // 1. Check on mount
     checkLoginStatus();
 
-    // 2. Listen for our custom event (triggered by AuthPage)
+    // Silent background verification to handle HTTP-only cookie expiration
+    const verifySession = async () => {
+      if (typeof window !== 'undefined' && localStorage.getItem('userState')) {
+        try {
+          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+          const res = await fetch(`${backendUrl}/docs/list`, { credentials: 'include' });
+          
+          if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem('userState');
+            setIsLoggedIn(false);
+          }
+        } catch (e) {
+          // Network errors ignored to prevent false logouts during spotty connectivity
+        }
+      }
+    };
+    verifySession();
+
+    // Event listener for cross-component auth state sync
     const handleAuthChange = () => checkLoginStatus();
     window.addEventListener('auth-change', handleAuthChange);
 
@@ -33,11 +55,10 @@ export default function Navbar() {
     try {
         await fetch(`${backendUrl}/auth/logout`, { method: 'POST' });
     } catch (e) {
-        console.error("Logout error", e);
+        console.error("Logout request failed:", e);
     }
-    localStorage.removeItem('userState');
     
-    // Dispatch event to update UI immediately
+    localStorage.removeItem('userState');
     window.dispatchEvent(new Event('auth-change'));
     
     router.push('/');
@@ -47,16 +68,13 @@ export default function Navbar() {
   // --- Dynamic Styling Logic ---
   const isLandingPage = pathname === '/';
 
-  // If landing page: Transparent, White Text.
-  // If app page: Gray-50 background (blends in), Dark Gray Text, No Shadow.
   const navClass = isLandingPage 
-    ? "fixed w-full z-50 transition-all duration-300 bg-transparent" 
-    : "fixed w-full z-50 transition-all duration-300 bg-gray-50 border-b border-gray-200/50"; // Subtle blend
+    ? "fixed top-0 w-full z-50 transition-all duration-300 bg-transparent" 
+    : "sticky top-0 w-full z-50 transition-all duration-300 bg-gray-50 border-b border-gray-200/50"; 
 
-  // Logo: Big on landing, Small/Subtle in app
   const logoClass = isLandingPage 
     ? "text-2xl font-extrabold text-white" 
-    : "text-lg font-semibold text-gray-700 hover:text-gray-900"; // Subtle gemini style
+    : "text-lg font-semibold text-gray-700 hover:text-gray-900"; 
 
   const linkClass = isLandingPage
     ? "text-white hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium"
@@ -67,7 +85,6 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           
-          {/* Logo Logic: Redirects based on Auth State */}
           <div className="flex items-center">
             <Link href={isLoggedIn ? "/home" : "/"} className={logoClass}>
               EduSage
@@ -85,7 +102,6 @@ export default function Navbar() {
                     </button>
                 </>
             ) : (
-                // Only show login button if we are strictly NOT logged in
                 <Link href="/auth" className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${isLandingPage ? 'bg-white text-purple-900 hover:bg-gray-100' : 'bg-purple-600 text-white hover:bg-purple-700'}`}>
                   Sign In
                 </Link>

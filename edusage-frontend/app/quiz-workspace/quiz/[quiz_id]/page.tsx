@@ -1,12 +1,16 @@
-'use client'; // Make it a Client Component
+'use client';
 
 import { useState, useEffect } from 'react';
 import QuizEditorForm from './QuizEditorForm';
 
-// Keep the Quiz interface
 interface Question { id?: number; question_text: string; options: string[] | null; correct_answer: string; question_type: string; }
 interface Quiz { id: number; title: string; instructions: string | null; questions: Question[]; }
 
+/**
+ * QuizEditorPage Component
+ * * Server-side wrapper that fetches the quiz data and passes it to the interactive editor form.
+ * * @param {Object} params - URL parameters containing the quiz_id.
+ */
 export default function QuizEditorPage({ params }: { params: { quiz_id: string } }) {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,8 +25,8 @@ export default function QuizEditorPage({ params }: { params: { quiz_id: string }
           credentials: 'include',
         });
         if (!res.ok) {
-          if (res.status === 401) throw new Error('Unauthorized');
-          throw new Error(`Failed to fetch quiz. Status: ${res.status}`);
+          if (res.status === 401) throw new Error('Unauthorized access. Please log in.');
+          throw new Error(`Failed to fetch quiz.`);
         }
         setQuiz(await res.json());
       } catch (err) {
@@ -32,14 +36,19 @@ export default function QuizEditorPage({ params }: { params: { quiz_id: string }
       }
     };
     fetchQuiz();
-  }, [params.quiz_id]); // Depend on quiz_id
+  }, [params.quiz_id]);
 
-  if (loading) return <p className="text-center mt-20">Loading Quiz Editor...</p>;
-  if (error) return <p className="text-center mt-20 text-red-500">Error: {error}</p>;
-  if (!quiz) return <p className="text-center mt-20">Quiz not found.</p>;
+  if (loading) return (
+    <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  );
+  
+  if (error) return <p className="text-center mt-20 text-red-500 font-medium">Error: {error}</p>;
+  if (!quiz) return <p className="text-center mt-20 text-gray-500">Quiz not found.</p>;
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-12 bg-gray-50">
+    <main className="flex min-h-screen flex-col items-center p-6 md:p-12 bg-gray-50">
       <QuizEditorForm initialQuiz={quiz} />
     </main>
   );

@@ -9,10 +9,10 @@ import {
   Tag, 
   ArrowLeft, 
   BrainCircuit,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 
-// --- Types for TypeScript Safety ---
 interface Breakdown {
   semantic_score: number;
   keyword_score: number;
@@ -47,16 +47,31 @@ interface QuickStudySession {
   report_data?: GradedResult[];
 }
 
+/**
+ * QuickStudyPage Component
+ * * Handles the dual-state UI for a Quick Study session. 
+ * State 1 (Taking Quiz): Renders questions and captures user input.
+ * State 2 (Report): Renders the evaluated results including AI breakdown metrics.
+ * * @param {Object} params - URL parameters containing the sessionId.
+ */
 export default function QuickStudyPage({ params: { sessionId } }: { params: { sessionId: string } }) {
+  const router = useRouter();
   const [session, setSession] = useState<QuickStudySession | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const router = useRouter();
+  
+  // Toast Notification State
+  const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+      setToast({ type, message });
+      setTimeout(() => setToast(null), 4000);
+  };
 
   useEffect(() => {
     const fetchSession = async () => {
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/api/v1';
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         const res = await fetch(`${backendUrl}/quick-study/${sessionId}`, {
           credentials: 'include'
         });
@@ -73,15 +88,16 @@ export default function QuickStudyPage({ params: { sessionId } }: { params: { se
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/api/v1';
+    setToast(null);
     
-    // Ensure keys are numbers for the backend schema
+    // Ensure keys are integers for the backend schema
     const formattedAnswers: Record<number, string> = {};
     Object.keys(answers).forEach(key => {
         formattedAnswers[parseInt(key)] = answers[parseInt(key)];
     });
 
     try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         const res = await fetch(`${backendUrl}/quick-study/${sessionId}/submit`, {
           method: 'POST',
           credentials: 'include',
@@ -92,19 +108,21 @@ export default function QuickStudyPage({ params: { sessionId } }: { params: { se
         if (res.ok) {
             setSession(await res.json()); 
             window.scrollTo(0, 0);
+            showToast('success', 'Analysis complete! Review your results below.');
         } else {
-            alert("Failed to submit. Please try again.");
+            showToast('error', 'Failed to submit answers. Please try again.');
         }
     } catch (e) {
-        alert("An error occurred during submission.");
+        showToast('error', 'A network error occurred during submission.');
+    } finally {
+        setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   if (!session) return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="animate-pulse flex flex-col items-center">
-              <div className="h-12 w-12 bg-gray-200 rounded-full mb-4"></div>
+              <div className="h-12 w-12 bg-gray-200 rounded-full mb-4 border-t-2 border-purple-600 animate-spin"></div>
               <p className="text-gray-500 font-medium">Loading Study Session...</p>
           </div>
       </div>
@@ -117,9 +135,19 @@ export default function QuickStudyPage({ params: { sessionId } }: { params: { se
     const percentage = Math.round((totalScore / maxScore) * 100);
 
     return (
-      <main className="min-h-screen bg-gray-50 p-6 md:p-12">
+      <main className="min-h-screen bg-gray-50 p-6 md:p-12 relative">
+        
+        {/* Floating Toast Notification */}
+        {toast && (
+            <div className={`fixed top-24 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right-8 ${
+                toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+            }`}>
+                {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                <span className="font-medium text-sm">{toast.message}</span>
+            </div>
+        )}
+
         <div className="max-w-4xl mx-auto space-y-8">
-          
           {/* Header Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 flex flex-col md:flex-row justify-between items-center gap-6">
             <div>
@@ -181,7 +209,7 @@ export default function QuickStudyPage({ params: { sessionId } }: { params: { se
                         </div>
                    </div>
 
-                   {/* THE DEFENSIBLE AI BREAKDOWN (Only for Subjective) */}
+                   {/* AI Breakdown (Subjective Only) */}
                    {isSubjective && result?.breakdown && (
                        <div className="px-6 pb-6">
                            <div className="bg-slate-50 rounded-xl border border-slate-200 p-5">
@@ -191,7 +219,6 @@ export default function QuickStudyPage({ params: { sessionId } }: { params: { se
                                </div>
 
                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                   {/* Metric 1: Semantic Match */}
                                    <div>
                                        <div className="flex justify-between items-center mb-1">
                                             <span className="text-sm font-medium text-gray-600 flex items-center gap-1">
@@ -210,7 +237,6 @@ export default function QuickStudyPage({ params: { sessionId } }: { params: { se
                                        </p>
                                    </div>
 
-                                   {/* Metric 2: Keywords */}
                                    <div>
                                        <p className="text-sm font-medium text-gray-600 mb-2 flex items-center gap-1">
                                            <Tag size={14} /> Keyword Detection
@@ -233,7 +259,6 @@ export default function QuickStudyPage({ params: { sessionId } }: { params: { se
                                    </div>
                                </div>
 
-                               {/* Feedback Text */}
                                <div className="mt-6 pt-4 border-t border-slate-200">
                                    <p className="text-sm font-bold text-gray-700 mb-1">Feedback:</p>
                                    <p className="text-sm text-gray-600 leading-relaxed">{result.feedback}</p>
@@ -263,7 +288,18 @@ export default function QuickStudyPage({ params: { sessionId } }: { params: { se
 
   // --- VIEW MODE: TAKING QUIZ (Input) ---
   return (
-    <main className="min-h-screen bg-gray-50 p-6 md:p-12 flex justify-center">
+    <main className="min-h-screen bg-gray-50 p-6 md:p-12 flex justify-center relative">
+      
+      {/* Floating Toast Notification */}
+      {toast && (
+          <div className={`fixed top-24 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right-8 ${
+              toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+              <AlertCircle size={18} />
+              <span className="font-medium text-sm">{toast.message}</span>
+          </div>
+      )}
+
       <div className="w-full max-w-3xl bg-white rounded-xl shadow-lg border border-gray-200 p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Quick Study</h1>
         <div className="flex items-center gap-2 mb-8">

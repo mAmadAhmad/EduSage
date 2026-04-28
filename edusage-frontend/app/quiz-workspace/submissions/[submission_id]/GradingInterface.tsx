@@ -10,14 +10,13 @@ import {
     BarChart3, 
     Tag, 
     Save, 
-    Loader2 
+    Loader2,
+    CheckCircle2,
+    AlertCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-// --- Types ---
-
-// Structure of questions coming from the Submission Details endpoint
-interface GradedQuestion {
+export interface GradedQuestion {
     question_id: number;
     question_text: string;
     question_type: string;
@@ -33,7 +32,6 @@ export interface SubmissionDetails {
     questions: GradedQuestion[];
 }
 
-// Helper types for AI Data
 interface Breakdown {
     semantic_score: number;
     keyword_score: number;
@@ -45,8 +43,6 @@ interface Keywords {
     missing: string[];
 }
 
-// Structure of the Graded Answer coming from the Report endpoint
-// Now includes 'id' which is the database primary key for the graded_answer row
 interface GradedAnswerResponse {
     id: number; 
     question_id: number;
@@ -62,14 +58,33 @@ interface GradingReport {
     graded_answers: GradedAnswerResponse[];
 }
 
+/**
+ * GradingInterface Component
+ * * Provides the UI for teachers to review student answers, trigger AI auto-grading,
+ * and manually override scores. Handles complex state mapping between draft 
+ * AI reports and final committed grades.
+ * * @param {SubmissionDetails} initialDetails - The hydrated submission object.
+ */
 export default function GradingInterface({ initialDetails }: { initialDetails: SubmissionDetails }) {
+    const router = useRouter();
     const [details] = useState<SubmissionDetails>(initialDetails);
+    
+    // Processing States
     const [isGrading, setIsGrading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [report, setReport] = useState<GradingReport | null>(null);
-    const router = useRouter();
 
-    // 1. Function to Trigger AI Auto-Grading
+    // UI Toast State
+    const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+    const triggerToast = (type: 'success' | 'error', message: string) => {
+        setToast({ type, message });
+        setTimeout(() => setToast(null), 4000);
+    };
+
+    /**
+     * Calls the backend AI evaluation endpoint to draft a grading report.
+     */
     const handleAutoGrade = async () => {
         setIsGrading(true);
         try {
@@ -83,28 +98,27 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
 
             if (!res.ok) throw new Error('Grading failed');
             
-            // We now directly set the DRAFT report returned by the POST
             const draftReport = await res.json();
             setReport(draftReport);
-            
+            triggerToast('success', 'AI Analysis complete. Review draft below.');
         } catch (error) {
-            alert('An error occurred during AI drafting.');
+            console.error('Auto-grading error:', error);
+            triggerToast('error', 'An error occurred during AI drafting.');
         } finally {
             setIsGrading(false);
         }
     };
-    // 2. Function to Handle Manual Score Edits (Local State Update)
+
+    /**
+     * Updates the local state when a teacher manually overrides a score.
+     */
     const handleScoreChange = (gradedAnswerId: number, newScore: string) => {
         if (!report) return;
         
-        // Allow user to type decimal points, but safeguard parsing
         const scoreVal = parseFloat(newScore);
         
-        // We create a new array with the updated score for the specific answer
         const updatedAnswers = report.graded_answers.map(ans => {
             if (ans.id === gradedAnswerId) {
-                // If it's NaN (empty string), we keep it as 0 or the previous value to avoid UI breaking, 
-                // but usually input type="number" handles this well.
                 return { ...ans, score: isNaN(scoreVal) ? 0 : scoreVal };
             }
             return ans;
@@ -113,15 +127,14 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
         setReport({ ...report, graded_answers: updatedAnswers });
     };
 
-    // 3. Function to Save Changes to Backend
+    /**
+     * Commits the reviewed draft report to the database.
+     */
     const handleSaveChanges = async () => {
         if (!report) return;
         setIsSaving(true);
         try {
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-            
-            // Map state to BatchGradeUpdate schema. 
-            // Note: In draft state, ans.id is actually the original answer.id.
             const updates = report.graded_answers.map(ans => ({
                 graded_answer_id: ans.id, 
                 score: ans.score,
@@ -137,18 +150,33 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
 
             if (!res.ok) throw new Error('Failed to save');
             
-            alert('Grades published successfully! Students can now view their results.');
-            router.push(`/quiz-workspace/quiz/${details.quiz_id}/submissions`);
+            triggerToast('success', 'Grades published! Redirecting...');
+            
+            // Brief delay so user sees the success toast before navigation
+            setTimeout(() => {
+                router.push(`/quiz-workspace/quiz/${details.quiz_id}/submissions`);
+            }, 1500);
 
         } catch (error) {
-            alert('Failed to publish grades.');
-        } finally {
+            console.error('Save error:', error);
+            triggerToast('error', 'Failed to publish grades. Please try again.');
             setIsSaving(false);
         }
     };
 
     return (
-        <div className="w-full max-w-5xl mx-auto pb-24">
+        <div className="w-full max-w-5xl mx-auto pb-24 relative">
+            
+            {/* Fixed Toast Notification (Top Right to avoid FAB collision) */}
+            {toast && (
+                <div className={`fixed top-24 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right-8 ${
+                    toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+                }`}>
+                    {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                    <span className="font-medium text-sm">{toast.message}</span>
+                </div>
+            )}
+
             {/* Header Section */}
             <div className="flex items-center justify-between mb-8">
                 <div>
@@ -165,9 +193,9 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
                 <button 
                     onClick={handleAutoGrade} 
                     disabled={isGrading}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-70"
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-70 disabled:hover:scale-100"
                 >
-                    {isGrading ? <Loader2 className="animate-spin" /> : <BrainCircuit />}
+                    {isGrading ? <Loader2 className="animate-spin" size={20} /> : <BrainCircuit size={20} />}
                     {isGrading ? 'AI Analysis Running...' : 'Run Auto-Grading'}
                 </button>
             </div>
@@ -175,8 +203,6 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
             {/* Questions List */}
             <div className="space-y-8">
                 {details.questions.map((q, index) => {
-                    // Match the Question from details to the Result from the report
-                    // Matching by question_text ensures we align correctly even if IDs are tricky on the frontend
                     const result = report?.graded_answers.find(ga => ga.question_text === q.question_text);
                     
                     return (
@@ -229,7 +255,6 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm text-gray-500 font-medium">Score:</span>
-                                                    {/* EDITABLE SCORE INPUT */}
                                                     <input 
                                                         type="number" 
                                                         value={result.score}
@@ -243,10 +268,9 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
                                                 </div>
                                             </div>
 
-                                            {/* Metrics Visualization (Only for Subjective Questions where breakdown exists) */}
+                                            {/* Metrics Visualization */}
                                             {result.breakdown && (
                                                 <div className="space-y-4 mb-6">
-                                                    {/* Semantic Bar */}
                                                     <div>
                                                         <div className="flex justify-between items-center mb-1">
                                                             <span className="text-xs font-medium text-gray-500 flex items-center gap-1">
@@ -256,13 +280,12 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
                                                         </div>
                                                         <div className="w-full bg-gray-200 rounded-full h-1.5">
                                                             <div 
-                                                                className={`h-1.5 rounded-full ${result.breakdown.semantic_score > 0.8 ? 'bg-green-500' : result.breakdown.semantic_score > 0.5 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                                                                className={`h-1.5 rounded-full transition-all duration-500 ${result.breakdown.semantic_score > 0.8 ? 'bg-green-500' : result.breakdown.semantic_score > 0.5 ? 'bg-yellow-500' : 'bg-red-500'}`} 
                                                                 style={{ width: `${result.breakdown.semantic_score * 100}%` }}
                                                             ></div>
                                                         </div>
                                                     </div>
 
-                                                    {/* Keyword Tags */}
                                                     <div>
                                                         <span className="text-xs font-medium text-gray-500 flex items-center gap-1 mb-2">
                                                             <Tag size={12} /> Keywords
@@ -283,7 +306,6 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
                                                 </div>
                                             )}
 
-                                            {/* Feedback Text */}
                                             <div>
                                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">AI Feedback</p>
                                                 <p className="text-sm text-gray-600 leading-relaxed">{result.feedback}</p>
@@ -297,15 +319,15 @@ export default function GradingInterface({ initialDetails }: { initialDetails: S
                 })}
             </div>
             
-            {/* Floating Save Button */}
+            {/* Floating Action Button (FAB) for Saving */}
             {report && (
-                <div className="fixed bottom-8 right-8 z-50 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="fixed bottom-8 right-8 z-40 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <button 
                         onClick={handleSaveChanges}
                         disabled={isSaving}
                         className="flex items-center gap-2 px-8 py-4 bg-green-600 text-white font-bold rounded-full shadow-lg hover:bg-green-700 hover:scale-105 transition-all disabled:opacity-70 disabled:scale-100"
                     >
-                        {isSaving ? <Loader2 className="animate-spin" /> : <Save size={20} />}
+                        {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
                         {isSaving ? 'Saving...' : 'Save Final Grades'}
                     </button>
                 </div>

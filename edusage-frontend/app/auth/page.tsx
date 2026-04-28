@@ -2,19 +2,28 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
+/**
+ * AuthPage Component
+ * * Handles user authentication (Login/Signup). Communicates with the FastAPI backend
+ * using standard form-data for login (OAuth2 compatible) and JSON for signup.
+ * Manages local session state and dispatches global events to update the Navbar.
+ */
 export default function AuthPage() {
+  const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+  
+  // Feedback States
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
     setIsLoading(true);
 
     const endpoint = isLogin ? '/auth/login' : '/auth/signup';
@@ -41,28 +50,33 @@ export default function AuthPage() {
       }
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.detail || 'Authentication failed');
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.detail || 'Authentication failed');
       }
 
       if (isLogin) {
         if (typeof window !== 'undefined') {
             localStorage.setItem('userState', 'active');
-            // THE FIX: Dispatch a custom event so Navbar updates immediately
             window.dispatchEvent(new Event('auth-change'));
         }
         router.push('/home'); 
         router.refresh();
       } else {
-        alert('Account created! Please log in.');
-        setIsLogin(true); // Switch to login view; fields remain filled
-        setIsLoading(false);
+        setSuccessMsg('Account created successfully! Please sign in.');
+        setIsLogin(true); 
       }
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'An error occurred. Please try again.');
+    } finally {
       setIsLoading(false);
     }
+  };
+
+  const toggleAuthMode = () => {
+      setIsLogin(!isLogin);
+      setError('');
+      setSuccessMsg('');
   };
 
   return (
@@ -100,7 +114,7 @@ export default function AuthPage() {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                 />
               </div>
               <div>
@@ -110,17 +124,19 @@ export default function AuthPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                 />
               </div>
             </div>
 
-            {error && <div className="text-red-600 text-sm text-center">{error}</div>}
+            {/* Status Messages */}
+            {error && <div className="text-red-600 text-sm text-center font-medium bg-red-50 p-2 rounded-md border border-red-100">{error}</div>}
+            {successMsg && <div className="text-green-600 text-sm text-center font-medium bg-green-50 p-2 rounded-md border border-green-100">{successMsg}</div>}
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 transition-colors"
+              className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-70 transition-colors"
             >
               {isLoading ? 'Processing...' : (isLogin ? 'Sign In' : 'Sign Up')}
             </button>
@@ -128,8 +144,8 @@ export default function AuthPage() {
 
           <div className="text-center mt-4">
             <button
-              onClick={() => { setIsLogin(!isLogin); setError(''); }}
-              className="text-sm font-medium text-purple-600 hover:text-purple-500"
+              onClick={toggleAuthMode}
+              className="text-sm font-medium text-purple-600 hover:text-purple-500 transition-colors"
             >
               {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
             </button>

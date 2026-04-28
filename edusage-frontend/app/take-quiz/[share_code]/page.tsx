@@ -1,5 +1,3 @@
-// app/take-quiz/[share_code]/page.tsx
-
 import QuizInterface from './QuizInterface';
 
 interface PublicQuiz {
@@ -9,6 +7,10 @@ interface PublicQuiz {
   questions: any[];
 }
 
+/**
+ * Server-side data fetching for the public quiz.
+ * Bypasses CORS and client-side load times by hydrating the component directly.
+ */
 async function getQuizByShareCode(share_code: string): Promise<PublicQuiz | null> {
   try {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -17,8 +19,7 @@ async function getQuizByShareCode(share_code: string): Promise<PublicQuiz | null
       credentials: 'include'
     });
     if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.detail || 'Failed to fetch quiz');
+      return null;
     }
     return res.json();
   } catch (error) {
@@ -27,15 +28,19 @@ async function getQuizByShareCode(share_code: string): Promise<PublicQuiz | null
   }
 }
 
-// This is our Server Component page
+/**
+ * TakeQuiz Server Component
+ * * Validates the share code against the backend. If valid, renders the interactive
+ * QuizInterface. If invalid, renders a standard 404/Not Found view.
+ */
 export default async function TakeQuizPage({ params: { share_code } }: { params: { share_code: string } }) {
   const quiz = await getQuizByShareCode(share_code);
 
   if (!quiz) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-24">
-        <h1 className="text-2xl font-bold">Quiz Not Found</h1>
-        <p className="text-gray-500">The share code may be invalid or the quiz has been closed.</p>
+      <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50 text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Quiz Not Found</h1>
+        <p className="text-gray-500">The share code may be invalid, or the instructor has closed this session.</p>
       </main>
     );
   }

@@ -1,25 +1,40 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CloudUpload, FileText, List as ListIcon, CheckCircle, ChevronLeft, BookOpen } from 'lucide-react';
+import { CloudUpload, FileText, List as ListIcon, ChevronLeft, BookOpen, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface ContextSelectorProps {
   onSelectionChange: (value: string, type: 'file' | 'text', chapter?: string) => void;  
   currentSelection: string;
 }
 
+/**
+ * ContextSelector Component
+ * * A multi-tab interface allowing users to select the knowledge context for AI operations.
+ * Supports selecting existing server-side documents, uploading new PDFs, and pasting raw text.
+ * Includes dynamic Table of Contents (TOC) fetching for targeted chapter selection.
+ * * @param {function} onSelectionChange - Callback fired when the context source or chapter changes.
+ * @param {string} currentSelection - The currently active file name or raw text string.
+ */
 export default function ContextSelector({ onSelectionChange, currentSelection }: ContextSelectorProps) {
   const [activeTab, setActiveTab] = useState<'select' | 'upload' | 'paste'>('select');
   const [files, setFiles] = useState<string[]>([]);
   const [textInput, setTextInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   
-  // NEW: State for the Table of Contents UI
+  // Chapter / TOC State
   const [chapters, setChapters] = useState<string[]>([]);
   const [selectedChapter, setSelectedChapter] = useState<string | undefined>(undefined);
   const [isLoadingChapters, setIsLoadingChapters] = useState(false);
 
-  // Fetch available files on mount
+  // Inline Feedback State
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  const showFeedback = (type: 'success' | 'error', message: string) => {
+      setFeedback({ type, message });
+      setTimeout(() => setFeedback(null), 3000);
+  };
+
   useEffect(() => {
     const fetchFiles = async () => {
       try {
@@ -33,9 +48,8 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
     fetchFiles();
   }, []);
 
-  // NEW: Fetch chapters when a file is selected
   const handleFileSelect = async (filename: string) => {
-    onSelectionChange(filename, 'file', undefined); // Reset chapter when new file selected
+    onSelectionChange(filename, 'file', undefined); 
     setSelectedChapter(undefined);
     setIsLoadingChapters(true);
     
@@ -54,7 +68,6 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
   };
 
   const handleChapterSelect = (chapter: string) => {
-    // Toggle off if clicked again
     const newChapter = selectedChapter === chapter ? undefined : chapter;
     setSelectedChapter(newChapter);
     onSelectionChange(currentSelection, 'file', newChapter);
@@ -63,6 +76,8 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
     setIsUploading(true);
+    setFeedback(null);
+    
     const file = e.target.files[0];
     const formData = new FormData();
     formData.append('file', file);
@@ -78,13 +93,13 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
       if (res.ok) {
         const data = await res.json();
         setFiles(prev => [...prev, data.filename]);
-        handleFileSelect(data.filename); // Automatically select and load TOC
+        handleFileSelect(data.filename); 
         setActiveTab('select'); 
       } else {
-        alert("Upload failed");
+        showFeedback('error', 'Upload failed. Please ensure it is a valid PDF.');
       }
     } catch (error) {
-      alert("Error uploading file");
+      showFeedback('error', 'Network error while uploading file.');
     } finally {
       setIsUploading(false);
     }
@@ -93,10 +108,9 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
   const handleTextConfirm = () => {
       if (!textInput.trim()) return;
       onSelectionChange(textInput, 'text');
-      alert("Text ready for use!");
+      showFeedback('success', 'Text saved and ready for use!');
   };
 
-  // Helper to reset view back to file list
   const clearSelection = () => {
     onSelectionChange('', 'file', undefined);
     setSelectedChapter(undefined);
@@ -105,9 +119,18 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
 
   return (
     <div className="w-full">
-      <label className="block text-sm font-medium text-gray-700 mb-2">Select Context Source</label>
+      <div className="flex items-center justify-between mb-2">
+        <label className="block text-sm font-medium text-gray-700">Select Context Source</label>
+        
+        {/* Inline Feedback Banner */}
+        {feedback && (
+          <span className={`text-xs font-medium flex items-center gap-1 ${feedback.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+            {feedback.type === 'success' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+            {feedback.message}
+          </span>
+        )}
+      </div>
       
-      {/* Hide Tabs if a file is actively selected and we are in "select" mode */}
       {!(activeTab === 'select' && currentSelection && !currentSelection.startsWith("Raw Text")) && (
         <div className="flex space-x-1 rounded-xl bg-gray-100 p-1 mb-4">
           {[
@@ -121,6 +144,7 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
               onClick={() => {
                 setActiveTab(tab.id as any);
                 if (tab.id !== 'select') clearSelection();
+                setFeedback(null);
               }}
               className={`w-full flex items-center justify-center py-2.5 text-sm font-medium leading-5 rounded-lg transition-all duration-200
                 ${activeTab === tab.id 
@@ -134,13 +158,10 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
         </div>
       )}
 
-      {/* Tab Content */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[150px]">
-        
-        {/* TAB 1: Select Existing & TOC View */}
+        {/* Select Existing & TOC View */}
         {activeTab === 'select' && (
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {/* If a file IS selected, show the TOC view */}
             {currentSelection ? (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex items-center justify-between mb-4 pb-2 border-b">
@@ -149,7 +170,7 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
                     <span className="truncate">{currentSelection}</span>
                   </div>
                   <button
-                  type="button" 
+                    type="button" 
                     onClick={clearSelection}
                     className="text-xs flex items-center text-gray-500 hover:text-gray-800 transition-colors"
                   >
@@ -173,7 +194,7 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
                     <div className="flex flex-wrap gap-2">
                       {chapters.map(chapter => (
                         <button
-                        type="button"
+                          type="button"
                           key={chapter}
                           onClick={() => handleChapterSelect(chapter)}
                           className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
@@ -190,7 +211,6 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
                 </div>
               </div>
             ) : (
-              /* If NO file is selected, show the list */
               <>
                 {files.length === 0 ? (
                   <p className="text-center text-gray-500 py-4 text-sm">No files uploaded yet.</p>
@@ -211,7 +231,7 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
           </div>
         )}
 
-        {/* TAB 2: Upload New */}
+        {/* Upload New */}
         {activeTab === 'upload' && (
           <div className="flex flex-col items-center justify-center h-full border-2 border-dashed border-gray-300 rounded-lg p-6 hover:bg-gray-50 transition-colors relative">
             <CloudUpload size={40} className="text-gray-400 mb-2" />
@@ -227,7 +247,7 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
           </div>
         )}
 
-        {/* TAB 3: Paste Text */}
+        {/* Paste Text */}
         {activeTab === 'paste' && (
           <div className="space-y-3">
             <textarea
@@ -240,9 +260,9 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
               type="button"
               onClick={handleTextConfirm}
               disabled={!textInput.trim()}
-              className="w-full py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 disabled:bg-gray-400"
+              className="w-full py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 disabled:bg-gray-400 transition-colors"
             >
-              {'Use This Text'}
+              Use This Text
             </button>
           </div>
         )}

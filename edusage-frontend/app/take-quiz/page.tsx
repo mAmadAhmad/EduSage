@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, BookOpen } from 'lucide-react';
 
+/**
+ * TakeQuizPage Component
+ * * A public-facing portal for students to enter a 6-character access code
+ * to join an active quiz session. Handles basic input validation and routing.
+ */
 export default function TakeQuizPage() {
   const [shareCode, setShareCode] = useState('');
   const router = useRouter();

@@ -3,15 +3,15 @@
 import { useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
-import { CheckCircle2, User, Hash } from 'lucide-react';
+import { CheckCircle2, User, Hash, AlertTriangle, AlertCircle } from 'lucide-react';
 
-// Define the public types
 interface PublicQuestion {
   id: number;
   question_text: string;
   question_type: string;
   options: string[] | null;
 }
+
 interface PublicQuiz {
   id: number;
   title: string;
@@ -19,43 +19,60 @@ interface PublicQuiz {
   questions: PublicQuestion[];
 }
 
+/**
+ * QuizInterface Component
+ * * The core interactive engine for student quiz-taking.
+ * Handles student registration (Name/Roll No), tracks answers locally,
+ * provides submission confirmation dialogs, and securely posts results to the backend.
+ * * @param {PublicQuiz} initialQuiz - The hydrated quiz object passed from the server component.
+ */
 export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz }) {
   const [quiz] = useState<PublicQuiz>(initialQuiz);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const router = useRouter();
   
+  // Registration State
   const [isStartModalOpen, setIsStartModalOpen] = useState(true);
   const [studentName, setStudentName] = useState('');
   const [studentRollNo, setStudentRollNo] = useState('');
+  
+  // Submission States
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+      setToast({ type, message });
+      setTimeout(() => setToast(null), 4000);
+  };
 
   const handleAnswerSelect = (questionId: number, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
   };
   
-  const handleSubmit = async () => {
-    // Basic validation
-    const answeredCount = Object.keys(answers).length;
-    if (answeredCount < quiz.questions.length) {
-        if (!confirm(`You have answered ${answeredCount} out of ${quiz.questions.length} questions. Submit anyway?`)) return;
-    } else {
-        if (!confirm('Ready to submit your quiz?')) return;
-    }
+  const triggerSubmitFlow = () => {
+      setIsConfirmModalOpen(true);
+  };
 
+  const executeSubmission = async () => {
+    setIsConfirmModalOpen(false);
     setIsSubmitting(true);
+    setToast(null);
     
     const formattedAnswers = Object.entries(answers).map(([questionId, answerText]) => ({
       question_id: parseInt(questionId), answer_text: answerText,
     }));
+    
     const submissionPayload = {
-      student_name: studentName, student_roll_no: studentRollNo, answers: formattedAnswers,
+      student_name: studentName, 
+      student_roll_no: studentRollNo, 
+      answers: formattedAnswers,
     };
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      // Get code from URL path safely
       const pathSegments = window.location.pathname.split('/');
-      const shareCode = pathSegments[pathSegments.length - 1]; // Last segment
+      const shareCode = pathSegments[pathSegments.length - 1];
 
       const res = await fetch(`${backendUrl}/take-quiz/${shareCode}/submit`, {
         method: 'POST',
@@ -66,20 +83,31 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
 
       if (!res.ok) throw new Error('Failed to submit quiz');
 
-      // Redirect to the success/home page (or maybe show a success state here)
-      // For now, let's just alert and go home, or we could redirect to a "Thank You" page
-      alert("Quiz submitted successfully!");
-      router.push('/'); 
+      // Extract the submission ID to redirect the student directly to their pending results page
+      const submissionData = await res.json();
+      router.push(`/results/${submissionData.id}`); 
       
     } catch (err) {
-      alert('An error occurred during submission.');
-    } finally {
+      showToast('error', 'An error occurred during submission. Please check your connection and try again.');
       setIsSubmitting(false);
     }
   };
 
+  const answeredCount = Object.keys(answers).length;
+  const isComplete = answeredCount === quiz.questions.length;
+
   return (
     <>
+      {/* Floating Toast Notification */}
+      {toast && (
+          <div className={`fixed top-6 right-6 z-[60] flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right-8 ${
+              toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+              <AlertCircle size={18} />
+              <span className="font-medium text-sm">{toast.message}</span>
+          </div>
+      )}
+
       {/* Registration Modal */}
       <Transition appear show={isStartModalOpen} as={Fragment}>
         <Dialog as="div" className="relative z-50" onClose={() => {}}>
@@ -119,20 +147,55 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
         </Dialog>
       </Transition>
 
-      {/* Main Quiz Area (Blurred if modal open) */}
+      {/* Confirmation Modal */}
+      <Transition appear show={isConfirmModalOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => setIsConfirmModalOpen(false)}>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className={`p-3 rounded-full ${isComplete ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                    {isComplete ? <CheckCircle2 size={24} /> : <AlertTriangle size={24} />}
+                  </div>
+                  <div>
+                    <Dialog.Title as="h3" className="text-lg font-bold text-gray-900">
+                        {isComplete ? 'Ready to Submit?' : 'Incomplete Quiz'}
+                    </Dialog.Title>
+                    <p className="text-sm text-gray-500">
+                        {isComplete 
+                            ? 'You have answered all questions. Submit your quiz for grading?' 
+                            : `You have only answered ${answeredCount} out of ${quiz.questions.length} questions. Are you sure you want to submit?`}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button type="button" onClick={() => setIsConfirmModalOpen(false)}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Return to Quiz
+                  </button>
+                  <button type="button" onClick={executeSubmission}
+                          className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-black">
+                    Submit Final Answers
+                  </button>
+                </div>
+              </Dialog.Panel>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* Main Quiz Area */}
       <div className={`w-full max-w-3xl mx-auto transition-all ${isStartModalOpen ? 'blur-md pointer-events-none' : ''}`}>
         
-        {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8 text-center">
             <h1 className="text-3xl font-extrabold text-gray-900 mb-2">{quiz.title}</h1>
             <p className="text-gray-500">{quiz.instructions || "Read the questions carefully and answer to the best of your ability."}</p>
         </div>
 
-        {/* Scrollable Questions List */}
         <div className="space-y-6 pb-24">
           {quiz.questions.map((q, index) => (
             <div key={q.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8 relative group hover:border-purple-200 transition-colors">
-              {/* Question Number Badge */}
               <div className="absolute top-6 left-0 w-1 h-8 bg-purple-600 rounded-r opacity-0 group-hover:opacity-100 transition-opacity"></div>
               
               <div className="mb-6">
@@ -179,14 +242,13 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
           ))}
         </div>
 
-        {/* Floating Submit Bar */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
             <div className="max-w-3xl mx-auto flex justify-between items-center">
                 <div className="text-sm font-medium text-gray-500 hidden md:block">
-                    {Object.keys(answers).length} of {quiz.questions.length} answered
+                    {answeredCount} of {quiz.questions.length} answered
                 </div>
                 <button 
-                    onClick={handleSubmit} 
+                    onClick={triggerSubmitFlow} 
                     disabled={isSubmitting}
                     className="w-full md:w-auto px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black disabled:opacity-70 transition-all flex items-center justify-center gap-2"
                 >

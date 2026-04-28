@@ -3,14 +3,22 @@
 import { useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
-import { Sparkles, X, Loader2 } from 'lucide-react';
+import { Sparkles, X, Loader2, AlertCircle } from 'lucide-react';
 import ContextSelector from '../components/ContextSelector'; 
 
+/**
+ * AIQuizGenerator Component
+ * * Provides a modal interface for users to configure and trigger AI-driven quiz generation.
+ * Handles form state, context selection (file vs. raw text), and communicates with the backend
+ * to generate and persist the new quiz before redirecting the user.
+ */
 export default function AIQuizGenerator() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
-  // State
+  // Configuration State
   const [sourceDoc, setSourceDoc] = useState('');
   const [rawText, setRawText] = useState('');
   const [chapter, setChapter] = useState<string | undefined>(undefined);
@@ -21,12 +29,17 @@ export default function AIQuizGenerator() {
   const [customInstructions, setCustomInstructions] = useState('');
   const [difficulty, setDifficulty] = useState('Normal');
   const [inputType, setInputType] = useState<'file' | 'text'>('file');
-  
-  const router = useRouter();
+
+  const handleClose = () => {
+    setIsOpen(false);
+    setErrorMsg(null);
+  };
 
   const handleContextSelection = (value: string, type: 'file' | 'text', selectedChapter?: string) => {
       setInputType(type);
       setChapter(selectedChapter);
+      setErrorMsg(null); // Clear errors when user interacts
+
       if (type === 'file') {
           setSourceDoc(value);
           setRawText('');
@@ -37,15 +50,16 @@ export default function AIQuizGenerator() {
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevents multiple rapid submissions
+    e.preventDefault();
+    setErrorMsg(null);
     
-    // Validation
+    // UI-Level Validation
     if (inputType === 'file' && !sourceDoc) {
-        alert("Please select a document from the list.");
+        setErrorMsg("Please select a document from the list.");
         return;
     }
     if (inputType === 'text' && !rawText) {
-        alert("Please paste and confirm your text.");
+        setErrorMsg("Please paste and confirm your text.");
         return;
     }
 
@@ -65,36 +79,39 @@ export default function AIQuizGenerator() {
         page_end: pageEnd === '' ? null : pageEnd,
         custom_instructions: customInstructions.trim() || null,
         chapter: chapter || null,
-        whole_document: isWholeDocument // Dynamically handles full file OR full chapter sampling
+        whole_document: isWholeDocument
       };
 
-      // 1. Generate
       const generateRes = await fetch(`${backendUrl}/docs/quiz/generate/`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!generateRes.ok) throw new Error('Failed to generate quiz content.');
+      
+      if (!generateRes.ok) {
+        const errData = await generateRes.json().catch(() => null);
+        throw new Error(errData?.detail || 'Failed to generate quiz content.');
+      }
+      
       const generatedQuiz = await generateRes.json();
 
-      // 2. Save
       const saveRes = await fetch(`${backendUrl}/quizzes/`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(generatedQuiz),
       });
+      
       if (!saveRes.ok) throw new Error('Failed to save the new quiz.');
 
-      // 3. Redirect
       const newQuiz = await saveRes.json();
-      setIsOpen(false);
+      handleClose();
       router.push(`/quiz-workspace/quiz/${newQuiz.id}`);
       router.refresh(); 
 
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'An unknown error occurred.');
+      setErrorMsg(error instanceof Error ? error.message : 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -111,14 +128,13 @@ export default function AIQuizGenerator() {
       </button>
 
       <Transition appear show={isOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={() => setIsOpen(false)}>
+        <Dialog as="div" className="relative z-50" onClose={handleClose}>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
           
           <div className="fixed inset-0 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
               <Dialog.Panel className="w-full max-w-xl transform overflow-hidden rounded-2xl bg-white p-8 text-left align-middle shadow-2xl transition-all">
                 
-                {/* Modal Header */}
                 <div className="flex justify-between items-start mb-6">
                     <div>
                         <Dialog.Title as="h3" className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -127,14 +143,20 @@ export default function AIQuizGenerator() {
                         </Dialog.Title>
                         <p className="text-sm text-gray-500 mt-1">Configure your settings and let AI do the heavy lifting.</p>
                     </div>
-                    <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                    <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 transition-colors">
                         <X size={24} />
                     </button>
                 </div>
 
+                {errorMsg && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
+                    <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+                    <p className="text-sm font-medium">{errorMsg}</p>
+                  </div>
+                )}
+
                 <form onSubmit={handleGenerate} className="space-y-6">
                   
-                  {/* Context Section */}
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                     <ContextSelector 
                         currentSelection={inputType === 'file' ? sourceDoc : rawText} 
@@ -142,7 +164,6 @@ export default function AIQuizGenerator() {
                     />
                   </div>
 
-                  {/* Settings Grid */}
                   <div className="grid grid-cols-2 gap-5">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">MCQ Count</label>
@@ -190,7 +211,7 @@ export default function AIQuizGenerator() {
                   </div>
                   
                   <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
-                    <button type="button" onClick={() => setIsOpen(false)}
+                    <button type="button" onClick={handleClose}
                             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
                       Cancel
                     </button>

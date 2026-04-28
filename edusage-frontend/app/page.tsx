@@ -44,12 +44,6 @@ export default function HomePage() {
             </div>
             {/* Feature 2 */}
             <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-              <div className="h-12 w-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-6 text-2xl">📊</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Lesson Planner</h3>
-              <p className="text-gray-600">Create structured lesson plans with slides, speaker notes, and learning objectives in seconds.</p>
-            </div>
-            {/* Feature 3 */}
-            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
               <div className="h-12 w-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-6 text-2xl">✅</div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">AI Grading</h3>
               <p className="text-gray-600">Let AI grade student submissions based on your criteria. Review, edit, and return feedback instantly.</p>

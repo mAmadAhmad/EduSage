@@ -1,11 +1,9 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, User, Calendar, CheckCircle2, Download } from 'lucide-react';
 
-// Updated interface to match the new backend schema
 interface SubmissionListResponse { 
     id: number; 
     student_name: string; 
@@ -14,6 +12,12 @@ interface SubmissionListResponse {
     is_graded: boolean; 
 }
 
+/**
+ * SubmissionsPage Component
+ * * Fetches and displays a tabular list of all student submissions for a specific quiz.
+ * Provides navigation to individual grading interfaces and CSV export functionality.
+ * * @param {Object} params - URL parameters containing the quiz_id.
+ */
 export default function SubmissionsPage({ params }: { params: { quiz_id: string } }) {
   const [submissions, setSubmissions] = useState<SubmissionListResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +34,7 @@ export default function SubmissionsPage({ params }: { params: { quiz_id: string 
         if (!res.ok) throw new Error('Failed to fetch submissions');
         setSubmissions(await res.json());
       } catch (err) {
-         setError(err instanceof Error ? err.message : 'Failed to load');
+         setError(err instanceof Error ? err.message : 'Failed to load submissions.');
       } finally {
         setLoading(false);
       }
@@ -40,7 +44,6 @@ export default function SubmissionsPage({ params }: { params: { quiz_id: string 
 
   const handleExport = () => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    // Trigger the file download in a new tab
     window.open(`${backendUrl}/submissions/quiz/${params.quiz_id}/export`, '_blank');
   };
 
@@ -57,6 +60,7 @@ export default function SubmissionsPage({ params }: { params: { quiz_id: string 
           <Link href="/quiz-workspace" className="text-gray-500 hover:text-gray-900 flex items-center gap-2 mb-4 font-medium">
             <ArrowLeft size={18}/> Back to Dashboard
           </Link>
+          
           <div className="flex justify-between items-end">
             <div className="flex items-center gap-4">
               <h1 className="text-3xl font-bold text-gray-900">Class Submissions</h1>
@@ -65,7 +69,6 @@ export default function SubmissionsPage({ params }: { params: { quiz_id: string 
               </span>
             </div>
 
-            {/* Download CSV Button */}
             {submissions.length > 0 && (
               <button
                   onClick={handleExport}
@@ -76,6 +79,12 @@ export default function SubmissionsPage({ params }: { params: { quiz_id: string 
             )}
           </div>
         </div>
+
+        {error && (
+            <div className="mb-6 bg-red-50 text-red-600 p-4 rounded-lg border border-red-200">
+                {error}
+            </div>
+        )}
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             {submissions.length > 0 ? (
@@ -103,7 +112,6 @@ export default function SubmissionsPage({ params }: { params: { quiz_id: string 
                                 {sub.student_roll_no || 'N/A'}
                             </td>
                             <td className="px-6 py-4">
-                                {/* Dynamic Status Badge */}
                                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
                                     sub.is_graded ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'
                                 }`}>
@@ -111,7 +119,6 @@ export default function SubmissionsPage({ params }: { params: { quiz_id: string 
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                                {/* Dynamic Action Button */}
                                 <Link 
                                     href={`/quiz-workspace/submissions/${sub.id}`} 
                                     className={`inline-flex items-center justify-center px-4 py-2 border shadow-sm text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
