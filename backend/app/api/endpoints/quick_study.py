@@ -28,7 +28,8 @@ async def start_quick_study(
         context_chunks = await retrieval.get_even_document_sample(
             source_document=request.source_document,
             tenant_id=tenant_id,
-            target_chunks=15
+            target_chunks=15,
+            chapter=request.chapter
         )
         if not context_chunks:
             raise HTTPException(status_code=404, detail="Document not found or is empty.")

@@ -1,5 +1,5 @@
 import secrets
-from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey, Float, Boolean
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
@@ -11,6 +11,7 @@ class Quiz(Base):
     title = Column(String, index=True)
     instructions = Column(Text, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    is_active = Column(Boolean, default=True)
 
     questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
 

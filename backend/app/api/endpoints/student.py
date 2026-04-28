@@ -24,11 +24,19 @@ def get_my_submissions(db: Session = Depends(get_db), current_user: schemas.User
             quiz_models.GradeReport.submission_id == sub.id
         ).first()
 
+        # SAFEGUARD: Check if the session or quiz still exists
+        quiz_title = "Deleted Quiz"
+        quiz_id = 0
+
+        if sub.quiz_session and sub.quiz_session.quiz:
+            quiz_title = sub.quiz_session.quiz.title
+            quiz_id = sub.quiz_session.quiz_id
+
         results.append({
             "submission_id": sub.id,
             "student_name": sub.student_name,
-            "quiz_id": sub.quiz_session.quiz_id,
-            "quiz_title": sub.quiz_session.quiz.title,
+            "quiz_id": quiz_id,
+            "quiz_title": quiz_title,
             "score": report.overall_score if report else None,
             "status": "Graded" if report else "Pending"
         })

@@ -35,7 +35,7 @@ async def grade_submission_with_ai(
         current_user: schemas.User = Depends(get_current_user)
 ):
     submission = db.query(quiz_models.Submission).filter(quiz_models.Submission.id == submission_id).first()
-    if not submission or submission.quiz_session.quiz.teacher_id != current_user.id:
+    if not submission or submission.quiz_session.quiz.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     tenant_id = f"user_{current_user.id}"
@@ -155,7 +155,7 @@ def update_submission_grades(
         current_user: schemas.User = Depends(get_current_user)
 ):
     submission = db.query(quiz_models.Submission).filter(quiz_models.Submission.id == submission_id).first()
-    if not submission or submission.quiz_session.quiz.teacher_id != current_user.id:
+    if not submission or submission.quiz_session.quiz.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     report = db.query(quiz_models.GradeReport).filter(quiz_models.GradeReport.submission_id == submission_id).first()

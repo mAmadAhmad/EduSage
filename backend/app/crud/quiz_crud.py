@@ -24,11 +24,12 @@ def create_quiz(db: Session, quiz: schemas.QuizCreate, user_id: int) -> quiz_mod
 def get_quiz(db: Session, quiz_id: int, user_id: int) -> quiz_models.Quiz | None:
     return db.query(quiz_models.Quiz).filter(
         quiz_models.Quiz.id == quiz_id,
-        quiz_models.Quiz.user_id == user_id
+        quiz_models.Quiz.user_id == user_id,
+        quiz_models.Quiz.is_active == True
     ).first()
 
 def get_quizzes(db: Session, user_id: int, skip: int = 0, limit: int = 100) -> List[quiz_models.Quiz]:
-    return db.query(quiz_models.Quiz).filter(quiz_models.Quiz.user_id == user_id).offset(skip).limit(limit).all()
+    return db.query(quiz_models.Quiz).filter(quiz_models.Quiz.user_id == user_id, quiz_models.Quiz.is_active==True).offset(skip).limit(limit).all()
 
 def update_quiz(db: Session, quiz_id: int, quiz: schemas.QuizUpdate, user_id: int) -> quiz_models.Quiz | None:
     db_quiz = get_quiz(db=db, quiz_id=quiz_id, user_id=user_id)
@@ -53,7 +54,7 @@ def update_quiz(db: Session, quiz_id: int, quiz: schemas.QuizUpdate, user_id: in
 def delete_quiz(db: Session, quiz_id: int, user_id: int) -> quiz_models.Quiz | None:
     db_quiz = get_quiz(db=db, quiz_id=quiz_id, user_id=user_id)
     if db_quiz:
-        db.delete(db_quiz)
+        db_quiz.is_active = False
         db.commit()
     return db_quiz
 

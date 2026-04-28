@@ -202,6 +202,8 @@ class QuickStudyCreate(BaseModel):
     text_content: Optional[str] = None
     num_mcq: int
     num_short_answer: int
+    chapter: Optional[str] = None
+
 
 class QuickStudySubmit(BaseModel):
     answers: Dict[int, str]
