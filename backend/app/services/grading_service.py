@@ -11,10 +11,10 @@ WEIGHT_LLM = 0.3
 
 
 async def calculate_hybrid_grade(question_text: str, correct_answer: str, student_answer: str,
-                                 reference_context: str = ""):
+                                 pre_extracted_keywords: list = None, reference_context: str = ""):
     semantic_score = _calculate_cosine_similarity(student_answer, correct_answer)
 
-    keywords = await _extract_keywords(correct_answer)
+    keywords = pre_extracted_keywords or []
     keyword_score, matched_keywords, missing_keywords = _calculate_keyword_match(student_answer, keywords)
 
     llm_feedback = await _generate_llm_evaluation(

@@ -59,3 +59,28 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> schemas
         raise HTTPException(status_code=401, detail="User not found")
 
     return user
+
+def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -> Optional[schemas.User]:
+    """
+    Attempts to get the current logged-in user from the cookie.
+    If the token is missing, expired, or invalid, it returns None helpful for guest access feature
+    """
+    token = request.cookies.get(COOKIE_NAME)
+
+    if not token:
+        return None
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+        token_data = schemas.TokenData(username=username)
+    except JWTError:
+        return None
+
+    user = user_crud.get_user_by_username(db, username=token_data.username)
+    if user is None:
+        return None
+
+    return user

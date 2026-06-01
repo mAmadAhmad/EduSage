@@ -1,8 +1,14 @@
+import string
+import random
 import secrets
 from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey, Float, Boolean
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
+
+def generate_access_pin():
+    """Generates a 5-character secure alphanumeric PIN."""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
 
 class Quiz(Base):
     __tablename__ = "quizzes"
@@ -25,6 +31,7 @@ class Question(Base):
     options = Column(JSON, nullable=True)
     source_citation = Column(JSON, nullable=True)
     correct_answer = Column(Text, nullable=False)
+    keywords = Column(JSON, nullable=True)
 
     quiz = relationship("Quiz", back_populates="questions")
 
@@ -44,7 +51,8 @@ class Submission(Base):
     quiz_session_id = Column(Integer, ForeignKey("quiz_sessions.id"))
     student_name = Column(String)
     student_roll_no = Column(String, nullable=True)
-    student_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    access_pin = Column(String, default=generate_access_pin, nullable=False)
 
     quiz_session = relationship("QuizSession")
     answers = relationship("Answer", back_populates="submission", cascade="all, delete-orphan")

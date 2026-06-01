@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -8,6 +8,7 @@ from app.crud import user_crud
 from app.services import auth_service
 from app.db.dependencies import get_db
 from app.core.config import settings
+from app.core.limiter import limiter
 
 router = APIRouter()
 
@@ -19,7 +20,8 @@ def signup(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return user_crud.create_user(db=db, user=user)
 
 @router.post("/login")
-def login(response: Response, db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
+@limiter.limit("5/minute")
+def login(response: Response, request: Request, db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
     user = user_crud.get_user_by_username(db, username=form_data.username)
     if not user or not auth_service.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -44,7 +46,15 @@ def login(response: Response, db: Session = Depends(get_db), form_data: OAuth2Pa
 
     return {"message": "Login successful"}
 
-@router.post("/logout")
+@router.post("/logout", summary="Invalidate user session")
 def logout(response: Response):
-    response.delete_cookie(key=auth_service.COOKIE_NAME)
-    return {"message": "Logged out successfully"}
+    response.set_cookie(
+        key="edusage_auth_token",
+        value="",
+        expires="Thu, 01 Jan 1970 00:00:00 GMT",
+        max_age=0,
+        path="/",
+        httponly=True,
+        samesite="lax"
+    )
+    return {"message": "Successfully logged out."}

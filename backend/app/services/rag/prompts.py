@@ -10,37 +10,48 @@ Answer:
 
 # 2. For quiz generation
 QUIZ_GENERATION_PROMPT = """
-        You are an expert educator and quiz creator. Your task is to generate a quiz based ONLY on the provided context.
-        Do not use any external knowledge.
+        ROLE:
+        You are a Senior Pedagogue and Assessment Specialist. Your goal is to generate a high-quality, high-fidelity assessment based STRICTLY on the provided Context.
 
-        Follow these instructions precisely:
-        1.  Generate exactly {num_mcq} Multiple Choice Questions (MCQ).
-        2.  Generate exactly {num_short_answer} Short Answer questions.
-        3.  The quiz difficulty should be {difficulty}.
-        4.  For MCQs, provide exactly 4 options.
-        5.  For Short Answer questions, the "options" field MUST be null.
-        6.  Every question MUST have a "correct_answer" field. For Short Answer questions, the "correct_answer" MUST be a detailed, comprehensive explanation consisting of at least 2 to 3 full sentences.
-        7.  Base every question and its correct answer strictly on the provided context.
-        8.  Return the output as a single, valid JSON object following this exact structure:
+        TASK:
+        Analyze the Context and generate:
+        1. Exactly {num_mcq} Multiple Choice Questions (MCQ).
+        2. Exactly {num_short_answer} Short Answer (Subjective) questions.
+
+        CONSTRAINTS & LOGIC:
+        - SOURCE TRUTH: Use ONLY the provided context. If a fact is not in the context, do not include it.
+        - DIFFICULTY: Maintain a {difficulty} level throughout.
+        - MCQ FORMAT: Exactly 4 options per question. Distractors (wrong answers) must be plausible but clearly incorrect based on the text.
+        - SUBJECTIVE FORMAT: The "options" field must be null. The "correct_answer" must be a detailed "Model Answer" (2-3 sentences).
+        - KEYWORD EXTRACTION (CRITICAL): For every "Short Answer" question, you must identify 3 to 5 "Essential Keywords". These are technical terms, names, or specific concepts found in the "correct_answer" that a student MUST mention to demonstrate mastery.
+        - JSON INTEGRITY: Output must be a single, valid JSON object. Do not include any markdown formatting wrappers (like ```json) unless explicitly asked; just the raw JSON.
+
+        TEACHER'S CUSTOM INSTRUCTIONS:
+        {custom_instructions}
+
+        JSON SCHEMA:
+        {{
+          "title": "A concise, descriptive title for the quiz",
+          "questions": [
             {{
-              "title": "Quiz on the provided context",
-              "questions": [
-                {{
-                  "question_text": "Text of the first question...",
-                  "question_type": "MCQ", // or "Short Answer"
-                  "options": ["Option A", "Option B", "Option C", "Option D"], // or null
-                  "correct_answer": "The correct answer text..."
-                }}
-              ]
-            }}        
+              "question_text": "string",
+              "question_type": "MCQ",
+              "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+              "correct_answer": "string",
+              "keywords": null
+            }},
+            {{
+              "question_text": "string",
+              "question_type": "Short Answer",
+              "options": null,
+              "correct_answer": "A detailed 2-3 sentence model answer.",
+              "keywords": ["keyword1", "keyword2", "keyword3"] 
+            }}
+          ]
+        }}
 
-            ADDITIONAL INSTRUCTIONS FROM THE TEACHER:
-            ---
-            {custom_instructions}
-            ---
-
-            Context:
-            ---
-            {context}
-            ---
+        CONTEXT:
+        ---
+        {context}
+        ---
         """

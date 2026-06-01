@@ -71,10 +71,10 @@ def get_quiz_by_share_code(db: Session, share_code: str) -> quiz_models.Quiz | N
         return session.quiz
     return None
 
-def create_submission(db: Session, session_id: int, submission: schemas.SubmissionCreate, student_id: int) -> quiz_models.Submission:
+def create_submission(db: Session, session_id: int, submission: schemas.SubmissionCreate, user_id: int | None) -> quiz_models.Submission:
     db_submission = quiz_models.Submission(
         quiz_session_id=session_id,
-        student_id=student_id,
+        user_id=user_id,
         student_name=submission.student_name,
         student_roll_no=submission.student_roll_no
     )

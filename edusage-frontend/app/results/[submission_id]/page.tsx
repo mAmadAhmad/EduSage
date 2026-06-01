@@ -1,6 +1,7 @@
 'use client'; 
 
 import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, XCircle, Award, ArrowLeft, Home, AlertCircle } from 'lucide-react';
 
@@ -20,59 +21,97 @@ interface GradeReportResponse {
     graded_answers: GradedAnswerReport[]; 
 }
 
-/**
- * ResultsPage Component
- * * Fetches and displays the final, teacher-approved grade report for a specific submission.
- * Handles "pending grade" states (404) gracefully by informing the student.
- * * @param {Object} params - URL parameters containing the submission_id.
- */
 export default function ResultsPage({ params }: { params: { submission_id: string } }) {
     const [report, setReport] = useState<GradeReportResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    
+    const searchParams = useSearchParams();
+    const pin = searchParams.get('pin');
 
     useEffect(() => {
+        let isMounted = true; 
+
+        const userState = localStorage.getItem('userState');
+        setIsLoggedIn(!!userState);
+        
         const fetchReport = async () => {
             try {
                 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-                const res = await fetch(`${backendUrl}/submissions/${params.submission_id}/report`, {
+                
+                const activePin = pin || new URLSearchParams(window.location.search).get('pin');
+
+                const url = activePin 
+                    ? `${backendUrl}/submissions/${params.submission_id}/report?pin=${activePin}`
+                    : `${backendUrl}/submissions/${params.submission_id}/report`;
+
+                const res = await fetch(url, {
                     cache: 'no-store',
                     credentials: 'include',
                 });
                 
+                if (!isMounted) return;
+
                 if (!res.ok) {
-                    if (res.status === 404) throw new Error('Your quiz is still being graded by the teacher.');
-                    throw new Error('Failed to fetch grade report.');
+                    if (res.status === 403) throw new Error("Invalid PIN. You do not have permission to view this report.");
+                    if (res.status === 404) throw new Error("Report not found. Your teacher may not have graded it yet.");
+                    throw new Error("Failed to fetch report.");
                 }
+
+                const data = await res.json();
                 
-                setReport(await res.json());
+                if (!isMounted) return;
+
+                setError(null);
+                setReport(data);
             } catch (err) {
+                if (!isMounted) return;
+                
                 setError(err instanceof Error ? err.message : 'Failed to load report.');
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
         fetchReport();
-    }, [params.submission_id]);
+        
+        return () => {
+            isMounted = false;
+        };
+    }, [params.submission_id, pin]); 
 
-    if (loading) return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-        </div>
-    );
-
-    if (error) return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-red-100 max-w-md w-full">
-                <div className="text-red-500 mb-4 flex justify-center"><AlertCircle size={48} /></div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Report Not Available</h2>
-                <p className="text-gray-500 mb-6 font-medium">{error}</p>
-                <Link href="/home" className="inline-flex items-center justify-center w-full px-6 py-3 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition-colors">
-                    Return to Dashboard
-                </Link>
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+                <div className="h-12 w-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-4 text-gray-500 font-medium animate-pulse">Retrieving your grade report...</p>
             </div>
-        </div>
-    );
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center">
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 max-w-md w-full">
+                    <div className="mx-auto h-16 w-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+                        <AlertCircle size={32} />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Report Unavailable</h2>
+                    <p className="text-gray-500 mb-8">{error}</p>
+                    
+                    <Link 
+                        href={isLoggedIn ? "/home" : "/"} 
+                        className="inline-flex items-center justify-center w-full px-6 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-colors"
+                    >
+                        <ArrowLeft size={18} className="mr-2" />
+                        {isLoggedIn ? "Return to Dashboard" : "Return to Homepage"}
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     if (!report) return null;
 
@@ -80,7 +119,6 @@ export default function ResultsPage({ params }: { params: { submission_id: strin
     const finalScore = report.overall_score ?? 0; 
     const percentage = Math.round((finalScore / totalPossibleScore) * 100);
     
-    // Dynamic status colors based on performance
     let statusColor = "text-purple-600 bg-purple-50 border-purple-100";
     if (percentage >= 80) statusColor = "text-green-600 bg-green-50 border-green-100";
     else if (percentage < 60) statusColor = "text-orange-600 bg-orange-50 border-orange-100";
@@ -89,10 +127,14 @@ export default function ResultsPage({ params }: { params: { submission_id: strin
         <main className="min-h-screen bg-gray-50 p-6 md:p-12 font-sans">
             <div className="max-w-3xl mx-auto">
                 
-                {/* Navigation Header */}
+                {/* Dynamic Navigation Header */}
                 <div className="flex justify-between items-center mb-8">
-                    <Link href="/home" className="text-gray-500 hover:text-gray-900 flex items-center gap-2 font-medium text-sm transition-colors">
-                        <ArrowLeft size={16} /> Back to Dashboard
+                    <Link 
+                        href={isLoggedIn ? "/home" : "/"} 
+                        className="text-gray-500 hover:text-gray-900 flex items-center gap-2 font-medium text-sm transition-colors"
+                    >
+                        <ArrowLeft size={16} /> 
+                        {isLoggedIn ? "Back to Dashboard" : "Back to Homepage"}
                     </Link>
                     <div className="text-sm font-mono text-gray-400 bg-gray-100 px-3 py-1 rounded-md">
                         ID: #{params.submission_id}
@@ -135,7 +177,6 @@ export default function ResultsPage({ params }: { params: { submission_id: strin
                         return (
                             <div key={index} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden transition-all hover:shadow-md">
                                 
-                                {/* Question Header */}
                                 <div className="bg-gray-50/80 px-6 py-4 border-b border-gray-100 flex justify-between items-start gap-4">
                                     <div className="flex gap-3">
                                         <span className="flex-shrink-0 flex items-center justify-center h-7 w-7 rounded-md bg-white border border-gray-200 text-gray-700 font-bold text-xs mt-0.5 shadow-sm">
@@ -148,7 +189,6 @@ export default function ResultsPage({ params }: { params: { submission_id: strin
                                     </span>
                                 </div>
 
-                                {/* Answer & Feedback Body */}
                                 <div className="p-6">
                                     <div className="mb-5">
                                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">

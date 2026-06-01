@@ -53,7 +53,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     try {
-        await fetch(`${backendUrl}/auth/logout`, { method: 'POST' });
+        await fetch(`${backendUrl}/auth/logout`, { method: 'POST', credentials: 'include' });
     } catch (e) {
         console.error("Logout request failed:", e);
     }

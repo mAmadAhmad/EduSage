@@ -8,6 +8,7 @@ class QuestionBase(BaseModel):
     question_type: str = 'MCQ'
     options: Optional[List[str]] = None
     correct_answer: str
+    keywords: Optional[List[str]] = None
     source_citation: Optional[Dict[str, Any]] = None
 
 class QuestionCreate(QuestionBase):
@@ -113,6 +114,8 @@ class Submission(SubmissionCreate):
     id: int
     quiz_session_id: int
     answers: List[Answer]
+    user_id: Optional[int] = None
+    access_pin: str
     model_config = ConfigDict(from_attributes=True)
 
 

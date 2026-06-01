@@ -3,15 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  Trophy,
-  Search,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  ArrowRight,
-  User
-} from 'lucide-react';
+import { Trophy, Search, Calendar, CheckCircle2, Clock, ArrowRight, User, Key } from 'lucide-react';
 
 interface ResultSummary {
   submission_id: number;
@@ -29,7 +21,11 @@ interface ResultSummary {
  */
 export default function ResultsHub() {
   const [myResults, setMyResults] = useState<ResultSummary[]>([]);
-  const [guestCode, setGuestCode] = useState('');
+  
+  // Guest Search State
+  const [guestId, setGuestId] = useState('');
+  const [guestPin, setGuestPin] = useState('');
+  
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -43,9 +39,6 @@ export default function ResultsHub() {
 
         if (res.ok) {
           setMyResults(await res.json());
-        } else {
-          // Silent catch for 401s (Unauthenticated guest users)
-          console.debug("Guest user detected. Relying on manual submission ID search.");
         }
       } catch (err) {
         console.error("Failed to fetch historical results:", err);
@@ -58,15 +51,15 @@ export default function ResultsHub() {
 
   const handleGuestSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!guestCode.trim()) return;
-    router.push(`/results/${guestCode}`);
+    if (!guestId.trim() || !guestPin.trim()) return;
+    // Pass the PIN via query parameters so the next page can securely fetch the report
+    router.push(`/results/${guestId.trim()}?pin=${guestPin.trim().toUpperCase()}`);
   };
 
   return (
     <main className="min-h-screen bg-gray-50 p-6 md:p-12 pt-24">
       <div className="max-w-4xl mx-auto space-y-12">
 
-        {/* Header Title */}
         <div className="text-center">
           <h1 className="text-4xl font-extrabold text-gray-900 flex items-center justify-center gap-3">
             <Trophy className="text-yellow-500" size={40} /> Result Center
@@ -74,32 +67,44 @@ export default function ResultsHub() {
           <p className="text-gray-500 mt-2 text-lg">Check your grades and review teacher feedback.</p>
         </div>
 
-        {/* SECTION 1: Guest Search Form */}
+        {/* UPDATED: Guest Search Form */}
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
-          <div className="max-w-md mx-auto">
-            <label className="block text-sm font-bold text-gray-700 mb-3 text-center uppercase tracking-wide">
+          <div className="max-w-xl mx-auto">
+            <label className="block text-sm font-bold text-gray-700 mb-4 text-center uppercase tracking-wide">
               Checking as a Guest?
             </label>
-            <form onSubmit={handleGuestSearch} className="relative">
-              <Search className="absolute left-4 top-3.5 text-gray-400" size={20} />
-              <input
-                type="number"
-                placeholder="Enter Submission ID (e.g. 45)"
-                value={guestCode}
-                onChange={(e) => setGuestCode(e.target.value)}
-                className="w-full pl-12 pr-14 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all font-medium text-gray-900"
-              />
+            <form onSubmit={handleGuestSearch} className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-3.5 text-gray-400" size={20} />
+                <input
+                  type="number"
+                  placeholder="Submission ID (e.g. 45)"
+                  value={guestId}
+                  onChange={(e) => setGuestId(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all font-medium text-gray-900"
+                />
+              </div>
+              <div className="relative flex-1">
+                <Key className="absolute left-4 top-3.5 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="PIN (e.g. R4T9)"
+                  value={guestPin}
+                  onChange={(e) => setGuestPin(e.target.value)}
+                  maxLength={5}
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all font-medium font-mono uppercase text-gray-900"
+                />
+              </div>
               <button
                 type="submit"
-                disabled={!guestCode.trim()}
-                className="absolute right-2 top-2 p-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:hover:bg-purple-600"
-                title="Search Results"
+                disabled={!guestId.trim() || !guestPin.trim()}
+                className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:hover:bg-purple-600 flex items-center justify-center sm:w-auto w-full"
               >
                 <ArrowRight size={20} />
               </button>
             </form>
-            <p className="text-xs text-center text-gray-400 mt-3 font-medium">
-              Enter the Submission ID provided at the end of your quiz.
+            <p className="text-xs text-center text-gray-400 mt-4 font-medium">
+              Enter the Submission ID and PIN provided at the end of your quiz.
             </p>
           </div>
         </div>

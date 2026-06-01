@@ -1,8 +1,9 @@
 import asyncio
 import csv
+from typing import Optional
 from io import StringIO
 from fastapi.responses import StreamingResponse
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 import weaviate.classes as wvc
 
@@ -10,9 +11,10 @@ from app.api import schemas
 from app.crud import quiz_crud
 from app.db.dependencies import get_db
 from app.services import grading_service
-from app.services.auth_service import get_current_user
+from app.services.auth_service import get_current_user, get_current_user_optional
 from app.models import quiz_models
 from app.services.rag import retrieval
+from app.core.limiter import limiter
 
 router = APIRouter()
 
@@ -28,8 +30,10 @@ def read_submission_details(submission_id: int, db: Session = Depends(get_db),
 
 
 @router.post("/{submission_id}/grade", summary="Draft AI Grades")
+@limiter.limit("10/minute")
 async def grade_submission_with_ai(
         submission_id: int,
+        req: Request,
         request: schemas.AIGradingRequest,
         db: Session = Depends(get_db),
         current_user: schemas.User = Depends(get_current_user)
@@ -84,6 +88,7 @@ async def grade_submission_with_ai(
                 question_text=question.question_text,
                 correct_answer=question.correct_answer,
                 student_answer=user_ans,
+                pre_extracted_keywords=question.keywords,
                 reference_context=reference_context
             )
             subjective_tasks.append(task)
@@ -115,10 +120,16 @@ async def grade_submission_with_ai(
 
 
 @router.get("/{submission_id}/report", response_model=schemas.GradeReportResponse, summary="Get the grade report")
-def read_grade_report(submission_id: int, db: Session = Depends(get_db)):
+def read_grade_report(submission_id: int, pin: Optional[str] = None, db: Session = Depends(get_db), current_user: Optional[schemas.User] = Depends(get_current_user_optional)):
     db_submission = db.query(quiz_models.Submission).filter(quiz_models.Submission.id == submission_id).first()
     if not db_submission:
         raise HTTPException(status_code=404, detail="Submission not found")
+
+    is_owner = current_user and db_submission.user_id == current_user.id
+    is_authorized_guest = pin and pin.upper() == db_submission.access_pin.upper()
+
+    if not (is_owner or is_authorized_guest):
+        raise HTTPException(status_code=403, detail="Unauthorized: Access PIN is required for guest reports.")
 
     db_report = db.query(quiz_models.GradeReport).filter(quiz_models.GradeReport.submission_id == submission_id).first()
     if not db_report:

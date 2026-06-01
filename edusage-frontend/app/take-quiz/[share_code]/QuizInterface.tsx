@@ -3,7 +3,7 @@
 import { useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
-import { CheckCircle2, User, Hash, AlertTriangle, AlertCircle } from 'lucide-react';
+import { CheckCircle2, User, Hash, AlertTriangle, AlertCircle, Copy, Check } from 'lucide-react';
 
 interface PublicQuestion {
   id: number;
@@ -40,6 +40,10 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  
+  // NEW: Success State for Guest PIN
+  const [submissionResult, setSubmissionResult] = useState<{ id: number, access_pin: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const showToast = (type: 'success' | 'error', message: string) => {
       setToast({ type, message });
@@ -83,9 +87,13 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
 
       if (!res.ok) throw new Error('Failed to submit quiz');
 
-      // Extract the submission ID to redirect the student directly to their pending results page
       const submissionData = await res.json();
-      router.push(`/results/${submissionData.id}`); 
+      
+      // Instead of redirecting to the 404 pending page, show the Success UI + PIN
+      setSubmissionResult({
+          id: submissionData.id,
+          access_pin: submissionData.access_pin
+      });
       
     } catch (err) {
       showToast('error', 'An error occurred during submission. Please check your connection and try again.');
@@ -93,8 +101,54 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
     }
   };
 
+  const copyToClipboard = () => {
+      if (!submissionResult) return;
+      navigator.clipboard.writeText(`ID: ${submissionResult.id} | PIN: ${submissionResult.access_pin}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+  };
+
   const answeredCount = Object.keys(answers).length;
   const isComplete = answeredCount === quiz.questions.length;
+
+  if (submissionResult) {
+      return (
+          <div className="w-full max-w-2xl mx-auto mt-12 bg-white rounded-2xl shadow-xl border border-gray-100 p-8 md:p-12 text-center animate-in zoom-in-95 duration-500">
+              <div className="mx-auto w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
+                  <CheckCircle2 size={40} />
+              </div>
+              <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Quiz Submitted!</h1>
+              <p className="text-gray-500 mb-8 text-lg">Your teacher will grade your submission. Save the details below to check your results later.</p>
+              
+              <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 max-w-md mx-auto mb-8 relative group">
+                  <div className="grid grid-cols-2 gap-4 text-left">
+                      <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Submission ID</p>
+                          <p className="text-2xl font-mono font-bold text-gray-900">{submissionResult.id}</p>
+                      </div>
+                      <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Access PIN</p>
+                          <p className="text-2xl font-mono font-bold text-purple-600">{submissionResult.access_pin}</p>
+                      </div>
+                  </div>
+                  <button 
+                      onClick={copyToClipboard}
+                      className="absolute top-4 right-4 p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 text-gray-600 transition-colors"
+                      title="Copy to clipboard"
+                  >
+                      {copied ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
+                  </button>
+              </div>
+
+              <button 
+                  onClick={() => router.push('/')}
+                  className="px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-colors"
+              >
+                  Return to Homepage
+              </button>
+          </div>
+      );
+  }
 
   return (
     <>

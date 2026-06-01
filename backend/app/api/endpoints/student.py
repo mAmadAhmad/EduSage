@@ -1,12 +1,13 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Request
+from app.core.limiter import limiter
 from sqlalchemy.orm import Session
 
 from app.api import schemas
 from app.crud import quiz_crud
 from app.db.dependencies import get_db
 from app.models import quiz_models
-from app.services.auth_service import get_current_user
+from app.services.auth_service import get_current_user, get_current_user_optional
 
 router = APIRouter()
 
@@ -15,7 +16,7 @@ router = APIRouter()
             summary="Get history of quizzes taken by logged-in user")
 def get_my_submissions(db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
     submissions = db.query(quiz_models.Submission).filter(
-        quiz_models.Submission.student_id == current_user.id
+        quiz_models.Submission.user_id == current_user.id
     ).order_by(quiz_models.Submission.id.desc()).all()
 
     results = []
@@ -24,7 +25,6 @@ def get_my_submissions(db: Session = Depends(get_db), current_user: schemas.User
             quiz_models.GradeReport.submission_id == sub.id
         ).first()
 
-        # SAFEGUARD: Check if the session or quiz still exists
         quiz_title = "Deleted Quiz"
         quiz_id = 0
 
@@ -53,8 +53,9 @@ def get_quiz_for_student(share_code: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{share_code}/submit", response_model=schemas.Submission, summary="Submit a student's answers for a quiz")
-def submit_quiz(share_code: str, submission: schemas.SubmissionCreate, db: Session = Depends(get_db),
-                current_user: schemas.User = Depends(get_current_user)):
+@limiter.limit("5/minute")
+def submit_quiz(req: Request, share_code: str, submission: schemas.SubmissionCreate, db: Session = Depends(get_db),
+                current_user: Optional[schemas.User] = Depends(get_current_user_optional)):
     session_obj = db.query(quiz_models.QuizSession).filter(
         quiz_models.QuizSession.share_code == share_code.upper()
     ).first()
@@ -62,9 +63,11 @@ def submit_quiz(share_code: str, submission: schemas.SubmissionCreate, db: Sessi
     if not session_obj:
         raise HTTPException(status_code=404, detail="Quiz session not found.")
 
+    user_id = current_user.id if current_user else None
+
     return quiz_crud.create_submission(
         db=db,
         session_id=session_obj.id,
         submission=submission,
-        student_id=current_user.id
+        user_id=user_id
     )

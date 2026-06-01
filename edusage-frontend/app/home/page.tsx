@@ -43,7 +43,7 @@ export default function UserHomePage() {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">Orchestrate Quizzes</h3>
-                  <p className="text-gray-600 mt-1">Create, edit, and manage assessments for your class. Generate with AI or build from scratch.</p>
+                  <p className="text-gray-600 mt-1">Create, edit, organize and grade quizzes.</p>
                 </div>
               </div>
             </Link>

@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 import weaviate.classes as wvc
 from weaviate.classes.tenants import Tenant
 from app.services import vector_service, auth_service
@@ -7,6 +7,7 @@ from app.services.rag import generation, ingestion, retrieval
 from app.core.config import settings
 from app.api import schemas
 from typing import List
+from app.core.limiter import limiter
 
 router = APIRouter()
 
@@ -132,7 +133,8 @@ async def rag_query(request: schemas.QueryRequest, current_user: schemas.User = 
 
 
 @router.post("/quiz/generate/", response_model=schemas.GenerateQuizResponse, summary="Generate Quiz from a document")
-async def generate_quiz(request: schemas.QuizGenerationRequest,
+@limiter.limit("3/minute")
+async def generate_quiz(request: schemas.QuizGenerationRequest, req: Request,
                         current_user: schemas.User = Depends(auth_service.get_current_user)):
     if not vector_service.get_quiz_chain():
         raise HTTPException(status_code=503, detail="Quiz generation chain is not initialized.")

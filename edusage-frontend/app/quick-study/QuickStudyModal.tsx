@@ -105,7 +105,7 @@ export default function QuickStudyModal() {
           </div>
           <div>
             <h3 className="text-2xl font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">Quick Study</h3>
-            <p className="text-gray-600 mt-1">Upload a document and test yourself immediately. No setup required.</p>
+            <p className="text-gray-600 mt-1">Upload a document and test yourself.</p>
           </div>
         </div>
       </button>
