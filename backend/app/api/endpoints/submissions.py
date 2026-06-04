@@ -33,8 +33,7 @@ def read_submission_details(submission_id: int, db: Session = Depends(get_db),
 @limiter.limit("10/minute")
 async def grade_submission_with_ai(
         submission_id: int,
-        req: Request,
-        request: schemas.AIGradingRequest,
+        request: Request,
         db: Session = Depends(get_db),
         current_user: schemas.User = Depends(get_current_user)
 ):

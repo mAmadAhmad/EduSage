@@ -54,7 +54,7 @@ def get_quiz_for_student(share_code: str, db: Session = Depends(get_db)):
 
 @router.post("/{share_code}/submit", response_model=schemas.Submission, summary="Submit a student's answers for a quiz")
 @limiter.limit("5/minute")
-def submit_quiz(req: Request, share_code: str, submission: schemas.SubmissionCreate, db: Session = Depends(get_db),
+def submit_quiz(request: Request, share_code: str, submission: schemas.SubmissionCreate, db: Session = Depends(get_db),
                 current_user: Optional[schemas.User] = Depends(get_current_user_optional)):
     session_obj = db.query(quiz_models.QuizSession).filter(
         quiz_models.QuizSession.share_code == share_code.upper()

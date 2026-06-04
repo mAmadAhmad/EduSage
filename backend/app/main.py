@@ -25,8 +25,8 @@ async def lifespan(_app: FastAPI):
     quick_study_model.Base.metadata.create_all(bind=session.engine)
     init_vector_service()
     yield
-    # On shutdown
 
+    # On shutdown
     close_vector_service()
 
 app = FastAPI(

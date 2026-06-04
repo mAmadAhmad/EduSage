@@ -134,14 +134,14 @@ async def rag_query(request: schemas.QueryRequest, current_user: schemas.User = 
 
 @router.post("/quiz/generate/", response_model=schemas.GenerateQuizResponse, summary="Generate Quiz from a document")
 @limiter.limit("3/minute")
-async def generate_quiz(request: schemas.QuizGenerationRequest, req: Request,
+async def generate_quiz(req: schemas.QuizGenerationRequest, request: Request,
                         current_user: schemas.User = Depends(auth_service.get_current_user)):
     if not vector_service.get_quiz_chain():
         raise HTTPException(status_code=503, detail="Quiz generation chain is not initialized.")
 
     tenant_id = f"user_{current_user.id}"
     try:
-        return await generation.generate_quiz_context_and_invoke(request, tenant_id)
+        return await generation.generate_quiz_context_and_invoke(req, tenant_id)
     except ValueError as val_err:
         raise HTTPException(status_code=404, detail=str(val_err))
     except Exception as exc:
