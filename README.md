@@ -1,4 +1,4 @@
-# 🧠 EduSage: AI-Powered Assessment & Defensible Grading Platform
+# 🧠 EduSage: AI Quiz Generation & Grading Platform
 
 EduSage is an end-to-end educational platform designed to streamline quiz orchestration, generation, and grading. Built with a focus on **AI Engineering and MLOps**, this project moves beyond standard API wrappers to solve a critical problem in EdTech: the unreliability of "black box" LLM grading.
 
@@ -8,7 +8,7 @@ By implementing a **3-Tier Hybrid AI Grading System** and preparing for advanced
 
 ## 🚀 Core Features
 
-### 1. Defensible Hybrid AI Grading
+### 1. Hybrid AI Grading
 Subjective answers are graded using a deterministic + probabilistic pipeline to prevent LLM hallucinations and ensure fair scoring:
 * **Semantic Match (Vector Search):** Calculates the topical overlap between the student's answer and the model answer using `sentence-transformers`.
 * **Keyword Extraction:** Ensures critical domain-specific terminology is present.
@@ -46,16 +46,6 @@ EduSage is structured as a monorepo containing a decoupled frontend and backend.
 
 ---
 
-## 🧠 Engineering Decisions & Philosophy
-
-As a final-year Software Engineering project focusing on AI systems, several architectural trade-offs were made to prioritize depth over breadth:
-
-* **Dropping "Feature Bloat" for Core Quality:** Feature creep (such as slide/presentation generation) was actively audited and removed from the codebase. The engineering focus was redirected entirely to improving the **Retrieval-Augmented Generation (RAG)** pipeline and the defensible grading engine.
-* **The Grading UI ("Glass Box" AI):** Instead of hiding the AI's grading process, the Teacher Dashboard exposes the semantic score and keyword detection. This builds trust with educators by keeping the human in the loop as the final arbiter of the grade.
-* **Upcoming Benchmark (WIP):** Currently upgrading the naive vector search to **Hybrid Search (BM25 + Vector)** using Weaviate's native capabilities. This will include a measurable benchmark evaluating question generation relevance (Old RAG vs. Hybrid RAG) to mathematically prove the performance gain on dense educational texts.
-
----
-
 ## 📂 Repository Structure
 
 ```
@@ -80,7 +70,6 @@ edusage-frontend/         # Next.js web application
 
 ## 👨‍💻 Author
 
-**Muhammad Amad** *B.S. Software Engineering | Aspiring AI Engineer & MLOps Practitioner* -
-- [Portfolio/Upwork](#) *https://www.upwork.com/freelancers/~015db1c1b95482aad2?mp_source=share*
+**Muhammad Amad** *B.S. Software Engineering | AI Engineer
 
 \`\`\`

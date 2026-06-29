@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -182,10 +182,11 @@ class BatchGradeUpdate(BaseModel):
 
 # --- USER AUTHENTICATION SCHEMAS ---
 class UserBase(BaseModel):
-    username: str
+    email: EmailStr
+    full_name: str
 
 class UserCreate(UserBase):
-    password: str
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters long")
 
 class User(UserBase):
     id: int
@@ -196,9 +197,17 @@ class Token(BaseModel):
     token_type: str
 
 class TokenData(BaseModel):
-    username: Optional[str] = None
+    email: Optional[str] = None
 
+class OTPVerify(BaseModel):
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
 
+class UserResponse(UserBase):
+    id: int
+    is_verified: bool
+    model_config = ConfigDict(from_attributes=True)
+    
 # --- QUICK STUDY SCHEMAS ---
 class QuickStudyCreate(BaseModel):
     source_document: Optional[str] = None
