@@ -48,7 +48,7 @@ def get_my_submissions(db: Session = Depends(get_db), current_user: schemas.User
 def get_quiz_for_student(share_code: str, db: Session = Depends(get_db)):
     db_quiz = quiz_crud.get_quiz_by_share_code(db, share_code=share_code.upper())
     if db_quiz is None:
-        raise HTTPException(status_code=404, detail="Quiz with this code not found.")
+        raise HTTPException(status_code=404, detail="Quiz with this code not found or is no longer accepting submissions.")
     return db_quiz
 
 
@@ -65,9 +65,12 @@ def submit_quiz(request: Request, share_code: str, submission: schemas.Submissio
 
     user_id = current_user.id if current_user else None
 
-    return quiz_crud.create_submission(
-        db=db,
-        session_id=session_obj.id,
-        submission=submission,
-        user_id=user_id
-    )
+    try:
+        return quiz_crud.create_submission(
+            db=db,
+            session_id=session_obj.id,
+            submission=submission,
+            user_id=user_id
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

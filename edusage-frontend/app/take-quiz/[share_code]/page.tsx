@@ -4,6 +4,7 @@ interface PublicQuiz {
   id: number;
   title: string;
   instructions: string | null;
+  time_limit_minutes: number | null; // NEW
   questions: any[];
 }
 
@@ -30,16 +31,21 @@ async function getQuizByShareCode(share_code: string): Promise<PublicQuiz | null
 
 /**
  * TakeQuiz Server Component
- * * Validates the share code against the backend. If valid, renders the interactive
+ * Validates the share code against the backend. If valid, renders the interactive
  * QuizInterface. If invalid, renders a standard 404/Not Found view.
  */
-export default async function TakeQuizPage({ params: { share_code } }: { params: { share_code: string } }) {
+// NEW: Next.js 15 requires params to be awaited
+export default async function TakeQuizPage({ params }: { params: Promise<{ share_code: string }> }) {
+  
+  const resolvedParams = await params;
+  const share_code = resolvedParams.share_code;
+
   const quiz = await getQuizByShareCode(share_code);
 
   if (!quiz) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50 text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Quiz Not Found</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Quiz Unavailable</h1>
         <p className="text-gray-500">The share code may be invalid, or the instructor has closed this session.</p>
       </main>
     );

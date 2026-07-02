@@ -1,18 +1,19 @@
 'use client';
 
 import { useState, FormEvent, Fragment } from 'react';
-import { Trash2, Plus, Save, ArrowLeft, AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Trash2, Plus, Save, ArrowLeft, AlertTriangle, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
 
 interface Question { id?: number; question_text: string; options: string[] | null; correct_answer: string; question_type: string; }
-interface Quiz { id: number; title: string; instructions: string | null; questions: Question[]; }
+// NEW: Added time_limit_minutes
+interface Quiz { id: number; title: string; instructions: string | null; time_limit_minutes: number | null; questions: Question[]; }
 
 /**
  * QuizEditorForm Component
- * * Interactive form for editing quiz metadata and questions. Handles dynamic question
+ * Interactive form for editing quiz metadata and questions. Handles dynamic question
  * addition, deletion, and robust state management before syncing with the backend.
- * * @param {Quiz} initialQuiz - The hydrated quiz object passed down from the parent page.
+ * @param {Quiz} initialQuiz - The hydrated quiz object passed down from the parent page.
  */
 export default function QuizEditorForm({ initialQuiz }: { initialQuiz: Quiz }) {
   const router = useRouter();
@@ -42,6 +43,7 @@ export default function QuizEditorForm({ initialQuiz }: { initialQuiz: Quiz }) {
         body: JSON.stringify({
             title: quiz.title,
             instructions: quiz.instructions,
+            time_limit_minutes: quiz.time_limit_minutes ? parseInt(quiz.time_limit_minutes.toString()) : null, // Ensure it sends as int or null
             questions: quiz.questions,
         }),
       });
@@ -138,6 +140,23 @@ export default function QuizEditorForm({ initialQuiz }: { initialQuiz: Quiz }) {
                 className="text-base text-gray-600 mt-4 w-full bg-transparent focus:outline-none resize-none placeholder-gray-400"
                 placeholder="Add instructions for your students..."
             />
+            
+            {/* NEW: Timer Input */}
+            <div className="mt-6 flex items-center gap-3 p-4 bg-gray-50 border border-gray-100 rounded-lg max-w-sm">
+                <Clock className="text-gray-400" size={20} />
+                <div className="flex-1">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Time Limit (Minutes)</label>
+                    <input
+                        type="number"
+                        name="time_limit_minutes"
+                        value={quiz.time_limit_minutes || ''}
+                        onChange={handleQuizChange}
+                        min="1"
+                        placeholder="Leave blank for no limit"
+                        className="w-full p-2 border border-gray-200 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
+                    />
+                </div>
+            </div>
         </div>
 
         {/* Questions List */}

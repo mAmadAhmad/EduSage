@@ -7,6 +7,7 @@ def create_quiz(db: Session, quiz: schemas.QuizCreate, user_id: int) -> quiz_mod
     db_quiz = quiz_models.Quiz(
         title=quiz.title,
         instructions=quiz.instructions,
+        time_limit_minutes=quiz.time_limit_minutes,
         user_id=user_id
     )
     db.add(db_quiz)
@@ -38,6 +39,7 @@ def update_quiz(db: Session, quiz_id: int, quiz: schemas.QuizUpdate, user_id: in
 
     db_quiz.title = quiz.title
     db_quiz.instructions = quiz.instructions
+    db_quiz.time_limit_minutes = quiz.time_limit_minutes
 
     for question in db_quiz.questions:
         db.delete(question)
@@ -67,11 +69,26 @@ def create_quiz_session(db: Session, quiz_id: int) -> quiz_models.QuizSession:
 
 def get_quiz_by_share_code(db: Session, share_code: str) -> quiz_models.Quiz | None:
     session = db.query(quiz_models.QuizSession).filter(quiz_models.QuizSession.share_code == share_code).first()
-    if session:
+    if session and session.is_active:
         return session.quiz
     return None
 
-def create_submission(db: Session, session_id: int, submission: schemas.SubmissionCreate, user_id: int | None) -> quiz_models.Submission:
+
+def create_submission(db: Session, session_id: int, submission: schemas.SubmissionCreate,
+                      user_id: int | None) -> quiz_models.Submission:
+    session = db.query(quiz_models.QuizSession).filter(quiz_models.QuizSession.id == session_id).first()
+    if not session or not session.is_active:
+        raise ValueError("This quiz is no longer accepting submissions.")
+
+    if submission.student_roll_no:
+        existing_submission = db.query(quiz_models.Submission).join(quiz_models.QuizSession).filter(
+            quiz_models.QuizSession.quiz_id == session.quiz_id,
+            quiz_models.Submission.student_roll_no == submission.student_roll_no
+        ).first()
+
+        if existing_submission:
+            raise ValueError(f"Roll number '{submission.student_roll_no}' has already submitted this quiz.")
+
     db_submission = quiz_models.Submission(
         quiz_session_id=session_id,
         user_id=user_id,

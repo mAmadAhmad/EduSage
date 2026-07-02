@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
-import { CheckCircle2, User, Hash, AlertTriangle, AlertCircle, Copy, Check } from 'lucide-react';
+import { CheckCircle2, User, Hash, AlertTriangle, AlertCircle, Copy, Check, Clock } from 'lucide-react';
 
 interface PublicQuestion {
   id: number;
@@ -16,15 +16,16 @@ interface PublicQuiz {
   id: number;
   title: string;
   instructions: string | null;
+  time_limit_minutes: number | null; // NEW: Timer property
   questions: PublicQuestion[];
 }
 
 /**
  * QuizInterface Component
- * * The core interactive engine for student quiz-taking.
+ * The core interactive engine for student quiz-taking.
  * Handles student registration (Name/Roll No), tracks answers locally,
- * provides submission confirmation dialogs, and securely posts results to the backend.
- * * @param {PublicQuiz} initialQuiz - The hydrated quiz object passed from the server component.
+ * enforces countdown timers, and securely posts results to the backend.
+ * @param {PublicQuiz} initialQuiz - The hydrated quiz object passed from the server component.
  */
 export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz }) {
   const [quiz] = useState<PublicQuiz>(initialQuiz);
@@ -41,14 +42,56 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   
-  // NEW: Success State for Guest PIN
+  // Success State for Guest PIN
   const [submissionResult, setSubmissionResult] = useState<{ id: number, access_pin: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Anti-Cheat State
+  const [infractions, setInfractions] = useState(0);
+  
+  // NEW: Timer State (in seconds)
+  const [timeLeft, setTimeLeft] = useState<number | null>(
+      initialQuiz.time_limit_minutes ? initialQuiz.time_limit_minutes * 60 : null
+  );
+
   const showToast = (type: 'success' | 'error', message: string) => {
       setToast({ type, message });
-      setTimeout(() => setToast(null), 4000);
+      setTimeout(() => setToast(null), 5000); // Extended slightly for reading errors
   };
+
+  // NEW: Timer Logic
+  useEffect(() => {
+    // Don't run timer if modal is open, quiz is submitted, or no timer exists
+    if (timeLeft === null || isStartModalOpen || submissionResult || isSubmitting) return;
+    
+    // Auto-submit when time reaches 0
+    if (timeLeft <= 0) {
+        showToast('error', 'Time is up! Submitting your answers automatically.');
+        executeSubmission();
+        return;
+    }
+
+    const timerId = setInterval(() => {
+        setTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [timeLeft, isStartModalOpen, submissionResult, isSubmitting]);
+
+  // Anti-Cheat Visibility API Hook
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && !isStartModalOpen && !submissionResult && !isSubmitting) {
+        setInfractions((prev) => prev + 1);
+        showToast('error', 'Warning: You left the quiz tab. This action has been recorded.');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isStartModalOpen, submissionResult, isSubmitting]);
 
   const handleAnswerSelect = (questionId: number, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
@@ -85,19 +128,24 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
         body: JSON.stringify(submissionPayload),
       });
 
-      if (!res.ok) throw new Error('Failed to submit quiz');
+      // Handle custom backend errors (like duplicate roll number)
+      if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          throw new Error(errData?.detail || 'Failed to submit quiz');
+      }
 
       const submissionData = await res.json();
       
-      // Instead of redirecting to the 404 pending page, show the Success UI + PIN
       setSubmissionResult({
           id: submissionData.id,
           access_pin: submissionData.access_pin
       });
       
     } catch (err) {
-      showToast('error', 'An error occurred during submission. Please check your connection and try again.');
+      showToast('error', err instanceof Error ? err.message : 'An error occurred during submission.');
       setIsSubmitting(false);
+      // If auto-submitted by timer but failed (e.g. duplicate roll no), we don't want them trapped. 
+      // They can read the error toast.
     }
   };
 
@@ -106,6 +154,18 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
       navigator.clipboard.writeText(`ID: ${submissionResult.id} | PIN: ${submissionResult.access_pin}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+  };
+
+  const preventClipboardActions = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    showToast('error', 'Copying and pasting are disabled during the assessment.');
+  };
+
+  // Helper to format seconds to MM:SS
+  const formatTime = (seconds: number) => {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   const answeredCount = Object.keys(answers).length;
@@ -152,7 +212,6 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
 
   return (
     <>
-      {/* Floating Toast Notification */}
       {toast && (
           <div className={`fixed top-6 right-6 z-[60] flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right-8 ${
               toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
@@ -172,6 +231,12 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
                  <Dialog.Title as="h3" className="text-2xl font-bold text-gray-900 mb-2">Welcome</Dialog.Title>
                  <p className="text-gray-500 mb-6">Please enter your details to start <strong>{quiz.title}</strong>.</p>
                 
+                {quiz.time_limit_minutes && (
+                    <div className="mb-6 flex items-center gap-2 p-3 bg-orange-50 border border-orange-100 rounded-lg text-orange-800 text-sm font-medium">
+                        <Clock size={18} /> This quiz has a strict time limit of {quiz.time_limit_minutes} minutes.
+                    </div>
+                )}
+
                 <div className="space-y-5">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Full Name <span className="text-red-500">*</span></label>
@@ -239,11 +304,25 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
         </Dialog>
       </Transition>
 
-      {/* Main Quiz Area */}
-      <div className={`w-full max-w-3xl mx-auto transition-all ${isStartModalOpen ? 'blur-md pointer-events-none' : ''}`}>
+      <div 
+        className={`w-full max-w-3xl mx-auto transition-all ${isStartModalOpen ? 'blur-md pointer-events-none' : ''}`}
+        onCopy={preventClipboardActions}
+        onPaste={preventClipboardActions}
+        onCut={preventClipboardActions}
+      >
         
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8 text-center">
-            <h1 className="text-3xl font-extrabold text-gray-900 mb-2">{quiz.title}</h1>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8 text-center relative">
+            {/* NEW: Timer Display */}
+            {timeLeft !== null && (
+                <div className={`absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold border ${
+                    timeLeft < 60 ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-orange-50 text-orange-600 border-orange-200'
+                }`}>
+                    <Clock size={16} />
+                    {formatTime(timeLeft)}
+                </div>
+            )}
+            
+            <h1 className="text-3xl font-extrabold text-gray-900 mb-2 mt-4">{quiz.title}</h1>
             <p className="text-gray-500">{quiz.instructions || "Read the questions carefully and answer to the best of your ability."}</p>
         </div>
 

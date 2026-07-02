@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { CloudUpload, FileText, List as ListIcon, ChevronLeft, BookOpen, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface ContextSelectorProps {
-  onSelectionChange: (value: string, type: 'file' | 'text', chapter?: string) => void;  
+  onSelectionChange: (value: string, type: 'file' | 'text', chapters?: string[]) => void;  
   currentSelection: string;
 }
-
 /**
  * ContextSelector Component
  * * A multi-tab interface allowing users to select the knowledge context for AI operations.
@@ -24,7 +23,7 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
   
   // Chapter / TOC State
   const [chapters, setChapters] = useState<string[]>([]);
-  const [selectedChapter, setSelectedChapter] = useState<string | undefined>(undefined);
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]); // Switched to Array
   const [isLoadingChapters, setIsLoadingChapters] = useState(false);
 
   // Inline Feedback State
@@ -48,9 +47,9 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
     fetchFiles();
   }, []);
 
-  const handleFileSelect = async (filename: string) => {
-    onSelectionChange(filename, 'file', undefined); 
-    setSelectedChapter(undefined);
+ const handleFileSelect = async (filename: string) => {
+    onSelectionChange(filename, 'file', []); 
+    setSelectedChapters([]); // Clear selections on new file
     setIsLoadingChapters(true);
     
     try {
@@ -68,9 +67,13 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
   };
 
   const handleChapterSelect = (chapter: string) => {
-    const newChapter = selectedChapter === chapter ? undefined : chapter;
-    setSelectedChapter(newChapter);
-    onSelectionChange(currentSelection, 'file', newChapter);
+    // If it's already selected, remove it. If not, add it.
+    const newChapters = selectedChapters.includes(chapter) 
+      ? selectedChapters.filter(c => c !== chapter) 
+      : [...selectedChapters, chapter];
+      
+    setSelectedChapters(newChapters);
+    onSelectionChange(currentSelection, 'file', newChapters);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,9 +114,9 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
       showFeedback('success', 'Text saved and ready for use!');
   };
 
-  const clearSelection = () => {
-    onSelectionChange('', 'file', undefined);
-    setSelectedChapter(undefined);
+ const clearSelection = () => {
+    onSelectionChange('', 'file', []);
+    setSelectedChapters([]);
     setChapters([]);
   };
 
@@ -192,20 +195,23 @@ export default function ContextSelector({ onSelectionChange, currentSelection }:
                     </p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {chapters.map(chapter => (
-                        <button
-                          type="button"
-                          key={chapter}
-                          onClick={() => handleChapterSelect(chapter)}
-                          className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
-                            selectedChapter === chapter 
-                              ? 'bg-purple-600 text-white border-purple-600 shadow-sm' 
-                              : 'bg-white text-gray-700 border-gray-300 hover:border-purple-400 hover:bg-purple-50'
-                          }`}
-                        >
-                          {chapter}
-                        </button>
-                      ))}
+                      {chapters.map(chapter => {
+                        const isSelected = selectedChapters.includes(chapter);
+                        return (
+                          <button
+                            type="button"
+                            key={chapter}
+                            onClick={() => handleChapterSelect(chapter)}
+                            className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                              isSelected 
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-sm' 
+                                : 'bg-white text-gray-700 border-gray-300 hover:border-purple-400 hover:bg-purple-50'
+                            }`}
+                          >
+                            {chapter}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

@@ -18,6 +18,7 @@ class Quiz(Base):
     instructions = Column(Text, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     is_active = Column(Boolean, default=True)
+    time_limit_minutes = Column(Integer, nullable=True)
 
     questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
 
@@ -41,6 +42,8 @@ class QuizSession(Base):
     id = Column(Integer, primary_key=True, index=True)
     quiz_id = Column(Integer, ForeignKey("quizzes.id"))
     share_code = Column(String, unique=True, index=True, default=lambda: secrets.token_urlsafe(4).upper())
+    time_limit_minutes = Column(Integer, nullable=True)
+    is_active = Column(Boolean, default=True)
 
     quiz = relationship("Quiz")
 

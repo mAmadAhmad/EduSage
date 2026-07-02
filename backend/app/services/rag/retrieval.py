@@ -3,11 +3,7 @@ from typing import List
 from app.services import vector_service
 from app.core.config import settings
 
-
 async def perform_hybrid_search(query: str, tenant_id: str, top_k: int = 15, filters=None) -> List[str]:
-    """
-    Executes a Hybrid search (BM25 + Vector) returning the top_k chunk contents.
-    """
     if not vector_service.weaviate_client:
         raise Exception("No Weaviate client available")
 
@@ -26,21 +22,12 @@ async def perform_hybrid_search(query: str, tenant_id: str, top_k: int = 15, fil
 
     return [obj.properties.get("content", "") for obj in response.objects]
 
-
-async def get_even_document_sample(source_document: str, tenant_id: str, target_chunks: int = 15,
-                                   chapter: str = None) -> List[str]:
-    """
-    Retrieves evenly spaced chunks across a document or chapter to provide comprehensive context.
-    """
+async def get_even_document_sample(tenant_id: str, target_chunks: int = 15, filters=None) -> List[str]:
     if not vector_service.weaviate_client:
         raise Exception("No Weaviate client available")
 
     collection = vector_service.weaviate_client.collections.get(settings.WEAVIATE_COLLECTION)
     tenant_collection = collection.with_tenant(tenant_id)
-
-    filters = wvc.query.Filter.by_property("source").equal(source_document)
-    if chapter:
-        filters = filters & wvc.query.Filter.by_property("chapter").equal(chapter)
 
     response = tenant_collection.query.fetch_objects(
         filters=filters,

@@ -4,9 +4,6 @@ import weaviate.classes as wvc
 
 
 async def generate_quiz_context_and_invoke(request, tenant_id: str):
-    """
-    Retrieves context via Hybrid Search or Even Sampling and invokes the Quiz LLM chain.
-    """
     context_chunks = []
     clean_text = request.text_content.strip() if request.text_content else ""
 
@@ -21,23 +18,28 @@ async def generate_quiz_context_and_invoke(request, tenant_id: str):
                           wvc.query.Filter.by_property("page").less_or_equal(request.page_end)
             filters = filters & page_filter
 
-        if request.chapter and request.chapter.lower() != "string":
-            chapter_filter = wvc.query.Filter.by_property("chapter").equal(request.chapter)
+        valid_chapters = []
+        if request.chapter:
+            valid_chapters = [c for c in request.chapter if c.lower() != "string"]
+
+        if valid_chapters:
+            chapter_filter = wvc.query.Filter.by_property("chapter").contains_any(valid_chapters)
             filters = filters & chapter_filter
 
-        if request.whole_document:
-            context_chunks = await retrieval.get_even_document_sample(
-                source_document=request.source_document,
-                tenant_id=tenant_id,
-                target_chunks=15,
-                chapter=request.chapter
-            )
-        else:
-            search_query = request.custom_instructions if request.custom_instructions else request.source_document
+        has_keywords = bool(
+            request.custom_instructions and request.custom_instructions.lower() != "string" and request.custom_instructions.strip())
+
+        if has_keywords:
             context_chunks = await retrieval.perform_hybrid_search(
-                query=search_query,
+                query=request.custom_instructions,
                 tenant_id=tenant_id,
                 top_k=15,
+                filters=filters
+            )
+        else:
+            context_chunks = await retrieval.get_even_document_sample(
+                tenant_id=tenant_id,
+                target_chunks=15,
                 filters=filters
             )
 

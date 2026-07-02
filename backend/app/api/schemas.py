@@ -24,6 +24,7 @@ class Question(QuestionBase):
 class QuizBase(BaseModel):
     title: str
     instructions: Optional[str] = None
+    time_limit_minutes: Optional[int] = None
 
 class QuizCreate(QuizBase):
     questions: List[QuestionCreate]
@@ -34,6 +35,8 @@ class Quiz(QuizBase):
     questions: List[Question] = []
     model_config = ConfigDict(from_attributes=True)
 
+class ShareCodeToggle(BaseModel):
+    is_active: bool
 
 # --- AI GENERATION SCHEMAS ---
 class QuizGenerationRequest(BaseModel):
@@ -46,7 +49,7 @@ class QuizGenerationRequest(BaseModel):
     page_end: Optional[int] = None
     custom_instructions: Optional[str] = None
     whole_document: bool = False
-    chapter: Optional[str] = None
+    chapter: Optional[List[str]] = None
 
 class GenerateQuizResponse(BaseModel):
     title: str

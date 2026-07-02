@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import QuizEditorForm from './QuizEditorForm';
 
 interface Question { id?: number; question_text: string; options: string[] | null; correct_answer: string; question_type: string; }
-interface Quiz { id: number; title: string; instructions: string | null; questions: Question[]; }
+// NEW: Added time_limit_minutes
+interface Quiz { id: number; title: string; instructions: string | null; time_limit_minutes: number | null; questions: Question[]; }
 
 /**
  * QuizEditorPage Component
- * * Server-side wrapper that fetches the quiz data and passes it to the interactive editor form.
- * * @param {Object} params - URL parameters containing the quiz_id.
+ * Server-side wrapper that fetches the quiz data and passes it to the interactive editor form.
+ * @param {Object} params - URL parameters containing the quiz_id.
  */
 export default function QuizEditorPage({ params }: { params: { quiz_id: string } }) {
   const [quiz, setQuiz] = useState<Quiz | null>(null);

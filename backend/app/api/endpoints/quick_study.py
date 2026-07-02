@@ -12,7 +12,6 @@ from app.services.rag import retrieval
 
 router = APIRouter()
 
-
 @router.post("/start", response_model=schemas.QuickStudyResponse, summary="Generate and start a Quick Study session")
 async def start_quick_study(
         request: schemas.QuickStudyCreate,
@@ -25,11 +24,25 @@ async def start_quick_study(
     if request.text_content:
         context = request.text_content
     elif request.source_document:
+        # Build the unified Weaviate filter object
+        filters = wvc.query.Filter.by_property("source").equal(request.source_document)
+
+        valid_chapters = []
+        if request.chapter:
+            # Handle both list (new schema) and string (fallback) dynamically
+            if isinstance(request.chapter, list):
+                valid_chapters = [c for c in request.chapter if c.lower() != "string"]
+            elif isinstance(request.chapter, str) and request.chapter.lower() != "string":
+                valid_chapters = [request.chapter]
+
+        if valid_chapters:
+            filters = filters & wvc.query.Filter.by_property("chapter").contains_any(valid_chapters)
+
+        # Pass the constructed filters object to the updated retrieval function
         context_chunks = await retrieval.get_even_document_sample(
-            source_document=request.source_document,
             tenant_id=tenant_id,
             target_chunks=15,
-            chapter=request.chapter
+            filters=filters
         )
         if not context_chunks:
             raise HTTPException(status_code=404, detail="Document not found or is empty.")

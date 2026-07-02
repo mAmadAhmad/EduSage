@@ -44,8 +44,13 @@ def share_quiz(quiz_id: int, db: Session = Depends(get_db), current_user: schema
     db_quiz = quiz_crud.get_quiz(db, quiz_id=quiz_id, user_id=current_user.id)
     if db_quiz is None:
         raise HTTPException(status_code=404, detail="Quiz not found")
-    session = quiz_crud.create_quiz_session(db=db, quiz_id=quiz_id)
-    return {"share_code": session.share_code}
+    session = db.query(quiz_models.QuizSession).filter(quiz_models.QuizSession.quiz_id == quiz_id).first()
+    if not session:
+        session = quiz_crud.create_quiz_session(db=db, quiz_id=quiz_id)
+    return {
+        "share_code": session.share_code,
+        "is_active": session.is_active
+    }
 
 @router.get("/{quiz_id}/submissions", response_model=List[schemas.SubmissionListResponse], summary="Get all submissions")
 def read_submissions_for_quiz(quiz_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
@@ -65,3 +70,22 @@ def read_submissions_for_quiz(quiz_id: int, db: Session = Depends(get_db), curre
             "is_graded": is_graded
         })
     return result
+
+
+@router.patch("/share/{share_code}/toggle", summary="Enable or Disable accepting submissions for a share code")
+def toggle_share_code(share_code: str, toggle_data: schemas.ShareCodeToggle, db: Session = Depends(get_db),
+                      current_user: schemas.User = Depends(get_current_user)):
+    session = db.query(quiz_models.QuizSession).join(quiz_models.Quiz).filter(
+        quiz_models.QuizSession.share_code == share_code,
+        quiz_models.Quiz.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Share code not found or unauthorized")
+
+    session.is_active = toggle_data.is_active
+    db.commit()
+
+    status_msg = "enabled" if session.is_active else "disabled"
+    return {"message": f"Quiz submissions have been {status_msg}.", "is_active": session.is_active,
+            "share_code": share_code}
