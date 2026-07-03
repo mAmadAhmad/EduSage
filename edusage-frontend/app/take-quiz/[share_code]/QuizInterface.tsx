@@ -16,56 +16,51 @@ interface PublicQuiz {
   id: number;
   title: string;
   instructions: string | null;
-  time_limit_minutes: number | null; // NEW: Timer property
+  time_limit_minutes: number | null;
   questions: PublicQuestion[];
 }
 
-/**
- * QuizInterface Component
- * The core interactive engine for student quiz-taking.
- * Handles student registration (Name/Roll No), tracks answers locally,
- * enforces countdown timers, and securely posts results to the backend.
- * @param {PublicQuiz} initialQuiz - The hydrated quiz object passed from the server component.
- */
 export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz }) {
   const [quiz] = useState<PublicQuiz>(initialQuiz);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const router = useRouter();
-  
+
   // Registration State
   const [isStartModalOpen, setIsStartModalOpen] = useState(true);
   const [studentName, setStudentName] = useState('');
   const [studentRollNo, setStudentRollNo] = useState('');
-  
+
   // Submission States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-  
+
   // Success State for Guest PIN
   const [submissionResult, setSubmissionResult] = useState<{ id: number, access_pin: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Anti-Cheat State
   const [infractions, setInfractions] = useState(0);
-  
-  // NEW: Timer State (in seconds)
+
+  // Timer States
   const [timeLeft, setTimeLeft] = useState<number | null>(
       initialQuiz.time_limit_minutes ? initialQuiz.time_limit_minutes * 60 : null
   );
+  // NEW: Flag to prevent infinite submission loops
+  const [hasAutoSubmitted, setHasAutoSubmitted] = useState(false);
 
   const showToast = (type: 'success' | 'error', message: string) => {
       setToast({ type, message });
-      setTimeout(() => setToast(null), 5000); // Extended slightly for reading errors
+      setTimeout(() => setToast(null), 5000);
   };
 
-  // NEW: Timer Logic
+  // Timer Logic
   useEffect(() => {
-    // Don't run timer if modal is open, quiz is submitted, or no timer exists
     if (timeLeft === null || isStartModalOpen || submissionResult || isSubmitting) return;
-    
-    // Auto-submit when time reaches 0
-    if (timeLeft <= 0) {
+
+    // Auto-submit when time reaches 0 (and only do it once)
+    if (timeLeft <= 0 && !hasAutoSubmitted) {
+        setHasAutoSubmitted(true); // Lock the auto-submit
         showToast('error', 'Time is up! Submitting your answers automatically.');
         executeSubmission();
         return;
@@ -76,12 +71,12 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [timeLeft, isStartModalOpen, submissionResult, isSubmitting]);
+  }, [timeLeft, isStartModalOpen, submissionResult, isSubmitting, hasAutoSubmitted]);
 
   // Anti-Cheat Visibility API Hook
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && !isStartModalOpen && !submissionResult && !isSubmitting) {
+      if (document.hidden && !isStartModalOpen && !submissionResult && !isSubmitting && timeLeft !== 0) {
         setInfractions((prev) => prev + 1);
         showToast('error', 'Warning: You left the quiz tab. This action has been recorded.');
       }
@@ -91,12 +86,12 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isStartModalOpen, submissionResult, isSubmitting]);
+  }, [isStartModalOpen, submissionResult, isSubmitting, timeLeft]);
 
   const handleAnswerSelect = (questionId: number, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
   };
-  
+
   const triggerSubmitFlow = () => {
       setIsConfirmModalOpen(true);
   };
@@ -105,14 +100,14 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
     setIsConfirmModalOpen(false);
     setIsSubmitting(true);
     setToast(null);
-    
+
     const formattedAnswers = Object.entries(answers).map(([questionId, answerText]) => ({
       question_id: parseInt(questionId), answer_text: answerText,
     }));
-    
+
     const submissionPayload = {
-      student_name: studentName, 
-      student_roll_no: studentRollNo, 
+      student_name: studentName,
+      student_roll_no: studentRollNo,
       answers: formattedAnswers,
     };
 
@@ -128,24 +123,21 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
         body: JSON.stringify(submissionPayload),
       });
 
-      // Handle custom backend errors (like duplicate roll number)
       if (!res.ok) {
           const errData = await res.json().catch(() => null);
           throw new Error(errData?.detail || 'Failed to submit quiz');
       }
 
       const submissionData = await res.json();
-      
+
       setSubmissionResult({
           id: submissionData.id,
           access_pin: submissionData.access_pin
       });
-      
+
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'An error occurred during submission.');
       setIsSubmitting(false);
-      // If auto-submitted by timer but failed (e.g. duplicate roll no), we don't want them trapped. 
-      // They can read the error toast.
     }
   };
 
@@ -161,7 +153,6 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
     showToast('error', 'Copying and pasting are disabled during the assessment.');
   };
 
-  // Helper to format seconds to MM:SS
   const formatTime = (seconds: number) => {
       const m = Math.floor(seconds / 60);
       const s = seconds % 60;
@@ -179,7 +170,7 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
               </div>
               <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Quiz Submitted!</h1>
               <p className="text-gray-500 mb-8 text-lg">Your teacher will grade your submission. Save the details below to check your results later.</p>
-              
+
               <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 max-w-md mx-auto mb-8 relative group">
                   <div className="grid grid-cols-2 gap-4 text-left">
                       <div>
@@ -191,7 +182,7 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
                           <p className="text-2xl font-mono font-bold text-purple-600">{submissionResult.access_pin}</p>
                       </div>
                   </div>
-                  <button 
+                  <button
                       onClick={copyToClipboard}
                       className="absolute top-4 right-4 p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 text-gray-600 transition-colors"
                       title="Copy to clipboard"
@@ -200,7 +191,7 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
                   </button>
               </div>
 
-              <button 
+              <button
                   onClick={() => router.push('/')}
                   className="px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-colors"
               >
@@ -230,7 +221,7 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
               <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-8 text-left align-middle shadow-2xl transition-all">
                  <Dialog.Title as="h3" className="text-2xl font-bold text-gray-900 mb-2">Welcome</Dialog.Title>
                  <p className="text-gray-500 mb-6">Please enter your details to start <strong>{quiz.title}</strong>.</p>
-                
+
                 {quiz.time_limit_minutes && (
                     <div className="mb-6 flex items-center gap-2 p-3 bg-orange-50 border border-orange-100 rounded-lg text-orange-800 text-sm font-medium">
                         <Clock size={18} /> This quiz has a strict time limit of {quiz.time_limit_minutes} minutes.
@@ -255,7 +246,7 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
                     </div>
                   </div>
                 </div>
-                
+
                 <button type="button" disabled={!studentName.trim()} onClick={() => setIsStartModalOpen(false)}
                         className="w-full mt-8 bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg">
                   Start Assessment
@@ -282,8 +273,8 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
                         {isComplete ? 'Ready to Submit?' : 'Incomplete Quiz'}
                     </Dialog.Title>
                     <p className="text-sm text-gray-500">
-                        {isComplete 
-                            ? 'You have answered all questions. Submit your quiz for grading?' 
+                        {isComplete
+                            ? 'You have answered all questions. Submit your quiz for grading?'
                             : `You have only answered ${answeredCount} out of ${quiz.questions.length} questions. Are you sure you want to submit?`}
                     </p>
                   </div>
@@ -304,15 +295,14 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
         </Dialog>
       </Transition>
 
-      <div 
+      <div
         className={`w-full max-w-3xl mx-auto transition-all ${isStartModalOpen ? 'blur-md pointer-events-none' : ''}`}
         onCopy={preventClipboardActions}
         onPaste={preventClipboardActions}
         onCut={preventClipboardActions}
       >
-        
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8 text-center relative">
-            {/* NEW: Timer Display */}
             {timeLeft !== null && (
                 <div className={`absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold border ${
                     timeLeft < 60 ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-orange-50 text-orange-600 border-orange-200'
@@ -321,7 +311,7 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
                     {formatTime(timeLeft)}
                 </div>
             )}
-            
+
             <h1 className="text-3xl font-extrabold text-gray-900 mb-2 mt-4">{quiz.title}</h1>
             <p className="text-gray-500">{quiz.instructions || "Read the questions carefully and answer to the best of your ability."}</p>
         </div>
@@ -330,16 +320,16 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
           {quiz.questions.map((q, index) => (
             <div key={q.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8 relative group hover:border-purple-200 transition-colors">
               <div className="absolute top-6 left-0 w-1 h-8 bg-purple-600 rounded-r opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              
+
               <div className="mb-6">
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">Question {index + 1}</span>
                   <h3 className="text-lg font-semibold text-gray-900 leading-snug">{q.question_text}</h3>
               </div>
-              
+
               {q.question_type === 'MCQ' && q.options ? (
                 <div className="grid grid-cols-1 gap-3">
                   {q.options.map((option, optIndex) => (
-                    <label key={optIndex} 
+                    <label key={optIndex}
                         className={`flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${
                             answers[q.id] === option 
                             ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-600' 
@@ -352,13 +342,13 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
                         <span className={`text-sm font-medium ${answers[q.id] === option ? 'text-purple-900' : 'text-gray-700'}`}>
                             {option}
                         </span>
-                        <input 
-                            type="radio" 
-                            name={`q-${q.id}`} 
+                        <input
+                            type="radio"
+                            name={`q-${q.id}`}
                             value={option}
                             checked={answers[q.id] === option}
                             onChange={() => handleAnswerSelect(q.id, option)}
-                            className="hidden" 
+                            className="hidden"
                         />
                     </label>
                   ))}
@@ -369,6 +359,7 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
                   onChange={(e) => handleAnswerSelect(q.id, e.target.value)}
                   className="w-full p-4 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none bg-gray-50 focus:bg-white transition-all text-base min-h-[140px]"
                   placeholder="Type your answer here..."
+                  disabled={timeLeft === 0}
                 />
               )}
             </div>
@@ -380,13 +371,13 @@ export default function QuizInterface({ initialQuiz }: { initialQuiz: PublicQuiz
                 <div className="text-sm font-medium text-gray-500 hidden md:block">
                     {answeredCount} of {quiz.questions.length} answered
                 </div>
-                <button 
-                    onClick={triggerSubmitFlow} 
-                    disabled={isSubmitting}
+                <button
+                    onClick={triggerSubmitFlow}
+                    disabled={isSubmitting || timeLeft === 0}
                     className="w-full md:w-auto px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black disabled:opacity-70 transition-all flex items-center justify-center gap-2"
                 >
                     {isSubmitting ? (
-                        <>Submitting...</> 
+                        <>Submitting...</>
                     ) : (
                         <>Submit Quiz <CheckCircle2 size={18} /></>
                     )}
